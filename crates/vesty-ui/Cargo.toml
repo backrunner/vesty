@@ -1,0 +1,18 @@
+[package]
+name = "vesty-ui"
+description = "UI descriptor and host-agnostic editor runtime traits for Vesty plugin editors."
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+vesty-core.workspace = true

@@ -1,0 +1,28 @@
+[package]
+name = "vesty-build"
+description = "Vesty project configuration, asset manifest and VST3 bundle packaging helpers."
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+camino.workspace = true
+mime_guess.workspace = true
+plist.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+vesty-params.workspace = true
+vesty-vst3-sys.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

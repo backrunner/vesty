@@ -1,0 +1,15 @@
+[package]
+name = "vesty-example-midi-synth"
+edition.workspace = true
+license.workspace = true
+publish = false
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+serde_json.workspace = true
+vesty.workspace = true

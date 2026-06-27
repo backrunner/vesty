@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "parameters": [
+    {
+      "id": "mix",
+      "name": "Mix",
+      "kind": {
+        "float": {
+          "min": 0.0,
+          "max": 100.0
+        }
+      },
+      "defaultNormalized": 0.5,
+      "unit": "%",
+      "stepCount": null,
+      "flags": {
+        "automatable": true,
+        "bypass": false,
+        "readOnly": false,
+        "programChange": false
+      },
+      "midiMappings": []
+    }
+  ]
+}

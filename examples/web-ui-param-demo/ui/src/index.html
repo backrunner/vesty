@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vesty Web UI Demo</title>
+  </head>
+  <body>
+    <main>
+      <label>
+        Mix
+        <input id="mix" type="range" min="0" max="1" step="0.001" value="0.5" />
+      </label>
+      <output id="value">0.500</output>
+      <output id="bridge-status">pending</output>
+      <label>
+        Peak
+        <meter id="peak" min="0" max="1" value="0"></meter>
+      </label>
+      <output id="meter-value">0.000</output>
+    </main>
+    <script type="module" src="./index.js"></script>
+  </body>
+</html>

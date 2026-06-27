@@ -1,0 +1,30 @@
+[package]
+name = "vesty-ui-wry"
+description = "System WebView runtime for Vesty editors built on wry custom protocols and IPC."
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[features]
+default = []
+wry-backend = ["dep:wry"]
+
+[dependencies]
+raw-window-handle.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+vesty-ipc.workspace = true
+vesty-ui.workspace = true
+wry = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true

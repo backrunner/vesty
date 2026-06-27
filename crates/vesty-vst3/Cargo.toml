@@ -1,0 +1,41 @@
+[package]
+name = "vesty-vst3"
+description = "VST3 adapter layer for Vesty plugins, isolating host-facing COM and unsafe code."
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[features]
+default = []
+vst3-bindings = ["dep:vst3"]
+wry-ui = [
+  "dep:vesty-bridge",
+  "dep:vesty-ipc",
+  "dep:vesty-ui",
+  "dep:vesty-ui-wry",
+  "vesty-ui-wry/wry-backend",
+]
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror.workspace = true
+vesty-core.workspace = true
+vesty-bridge = { workspace = true, optional = true }
+vesty-ipc = { workspace = true, optional = true }
+vesty-ui = { workspace = true, optional = true }
+vesty-ui-wry = { workspace = true, optional = true }
+vesty-params.workspace = true
+vesty-rt.workspace = true
+vesty-vst3-sys = { workspace = true, features = ["upstream-vst3"] }
+vst3 = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true

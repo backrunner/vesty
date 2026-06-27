@@ -1,0 +1,31 @@
+[package]
+name = "vesty"
+description = "Rust-first VST3 plugin framework with realtime DSP and system WebView UI support."
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[features]
+default = ["vst3-wry-ui"]
+vst3 = ["dep:vesty-vst3"]
+vst3-bindings = ["vst3", "vesty-vst3/vst3-bindings"]
+vst3-wry-ui = ["vst3-bindings", "webview-wry", "vesty-vst3/wry-ui"]
+webview-wry = ["dep:vesty-ui-wry"]
+
+[dependencies]
+vesty-bridge.workspace = true
+vesty-core.workspace = true
+vesty-ipc.workspace = true
+vesty-macros.workspace = true
+vesty-params.workspace = true
+vesty-rt.workspace = true
+vesty-ui.workspace = true
+vesty-ui-wry = { workspace = true, optional = true }
+vesty-vst3 = { workspace = true, optional = true }

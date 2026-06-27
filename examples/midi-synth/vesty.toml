@@ -1,0 +1,11 @@
+[plugin]
+name = "Vesty MIDI Synth"
+vendor = "Vesty"
+version = "0.1.0"
+kind = "Instrument"
+class_id = "56455354-4953-594e-5448-303030303031"
+
+[package]
+bundle_id = "dev.vesty.midi-synth"
+category = "Instrument"
+parameter_manifest = "vesty-parameters.json"

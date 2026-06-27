@@ -1,0 +1,24 @@
+[package]
+name = "vesty-ipc"
+description = "Typed JSBridge packets, snapshots and protocol schema exports for Vesty Web UIs."
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+ts-rs.workspace = true
+vesty-params.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

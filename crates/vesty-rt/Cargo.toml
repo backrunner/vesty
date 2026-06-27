@@ -1,0 +1,18 @@
+[package]
+name = "vesty-rt"
+description = "Realtime-safe queues, fixed event lists and allocation guards for Vesty plugins."
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+rtrb.workspace = true
+thiserror.workspace = true
+vesty-core.workspace = true

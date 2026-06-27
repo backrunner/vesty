@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "idAlgorithm": "vesty.vst3.param.fnv1a31-positive.v2",
+  "parameters": [
+    {
+      "id": "mix",
+      "vst3ParamId": 2093438089,
+      "spec": {
+        "id": "mix",
+        "name": "Mix",
+        "kind": {
+          "float": {
+            "min": 0.0,
+            "max": 100.0
+          }
+        },
+        "defaultNormalized": 0.5,
+        "unit": "%",
+        "stepCount": null,
+        "flags": {
+          "automatable": true,
+          "bypass": false,
+          "readOnly": false,
+          "programChange": false
+        },
+        "midiMappings": []
+      }
+    }
+  ]
+}

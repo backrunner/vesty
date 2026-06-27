@@ -1,0 +1,21 @@
+[package]
+name = "vesty-bridge"
+description = "State store, subscriptions, backpressure and routing runtime for the Vesty JSBridge."
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+thiserror.workspace = true
+vesty-core.workspace = true
+vesty-ipc.workspace = true
+vesty-params.workspace = true
+vesty-rt.workspace = true

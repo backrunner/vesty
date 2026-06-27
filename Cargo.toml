@@ -1,0 +1,106 @@
+[workspace]
+members = [
+  "crates/vesty",
+  "crates/vesty-core",
+  "crates/vesty-params",
+  "crates/vesty-rt",
+  "crates/vesty-vst3",
+  "crates/vesty-ipc",
+  "crates/vesty-bridge",
+  "crates/vesty-ui",
+  "crates/vesty-ui-wry",
+  "crates/vesty-vst3-sys",
+  "crates/vesty-build",
+  "crates/vesty-cli",
+  "crates/vesty-macros",
+  "examples/gain",
+  "examples/midi-synth",
+  "examples/web-ui-param-demo",
+]
+resolver = "2"
+
+[workspace.package]
+authors = ["Vesty Contributors"]
+categories = ["multimedia::audio", "api-bindings", "development-tools"]
+edition = "2024"
+homepage = "https://github.com/orchiliao/vesty"
+keywords = ["vst3", "audio", "plugin", "webview", "dsp"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/orchiliao/vesty"
+rust-version = "1.95"
+version = "0.1.0"
+
+[workspace.dependencies]
+arc-swap = "1.9.1"
+atomic_float = "1.1.0"
+camino = "1.2.2"
+cargo_metadata = "0.23.1"
+clap = { version = "4.6.1", features = ["derive"] }
+mime_guess = "2.0.5"
+plist = "1.9.0"
+proc-macro-crate = "3.5.0"
+proc-macro2 = "1.0.106"
+quote = "1.0.45"
+raw-window-handle = "0.6.2"
+rtrb = "0.3.4"
+schemars = { version = "1.2.1", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+sha2 = "0.11.0"
+syn = "2.0.117"
+tempfile = "3.27.0"
+thiserror = "2.0.18"
+toml = "1.1.2"
+tracing = "0.1.44"
+ts-rs = { version = "12.0.1", features = ["serde-compat", "serde-json-impl"] }
+vst3 = "0.3.0"
+wry = { version = "0.55.1", default-features = false, features = ["protocol", "os-webview"] }
+
+[workspace.dependencies.vesty]
+path = "crates/vesty"
+version = "0.1.0"
+
+[workspace.dependencies.vesty-bridge]
+path = "crates/vesty-bridge"
+version = "0.1.0"
+
+[workspace.dependencies.vesty-build]
+path = "crates/vesty-build"
+version = "0.1.0"
+
+[workspace.dependencies.vesty-core]
+path = "crates/vesty-core"
+version = "0.1.0"
+
+[workspace.dependencies.vesty-ipc]
+path = "crates/vesty-ipc"
+version = "0.1.0"
+
+[workspace.dependencies.vesty-macros]
+path = "crates/vesty-macros"
+version = "0.1.0"
+
+[workspace.dependencies.vesty-params]
+path = "crates/vesty-params"
+version = "0.1.0"
+
+[workspace.dependencies.vesty-rt]
+path = "crates/vesty-rt"
+version = "0.1.0"
+
+[workspace.dependencies.vesty-ui]
+path = "crates/vesty-ui"
+version = "0.1.0"
+
+[workspace.dependencies.vesty-ui-wry]
+path = "crates/vesty-ui-wry"
+version = "0.1.0"
+
+[workspace.dependencies.vesty-vst3]
+path = "crates/vesty-vst3"
+version = "0.1.0"
+
+[workspace.dependencies.vesty-vst3-sys]
+path = "crates/vesty-vst3-sys"
+version = "0.1.0"
+default-features = false

@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "parameters": [
+    {
+      "id": "level",
+      "name": "Level",
+      "kind": {
+        "float": {
+          "min": 0.0,
+          "max": 1.0
+        }
+      },
+      "defaultNormalized": 0.5,
+      "unit": null,
+      "stepCount": null,
+      "flags": {
+        "automatable": true,
+        "bypass": false,
+        "readOnly": false,
+        "programChange": false
+      },
+      "midiMappings": []
+    },
+    {
+      "id": "program",
+      "name": "Program",
+      "kind": {
+        "choice": {
+          "values": [
+            "Init",
+            "Bright Lead",
+            "Soft Bass"
+          ]
+        }
+      },
+      "defaultNormalized": 0.0,
+      "unit": null,
+      "stepCount": 2,
+      "flags": {
+        "automatable": true,
+        "bypass": false,
+        "readOnly": false,
+        "programChange": true
+      },
+      "midiMappings": [
+        {
+          "controller": 130,
+          "channel": null
+        }
+      ]
+    }
+  ]
+}

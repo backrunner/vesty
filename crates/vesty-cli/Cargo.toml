@@ -1,0 +1,32 @@
+[package]
+name = "vesty-cli"
+description = "Command-line scaffolding, build, package, validate and release evidence tooling for Vesty."
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[[bin]]
+name = "vesty"
+path = "src/main.rs"
+
+[dependencies]
+camino.workspace = true
+clap.workspace = true
+plist.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+vesty-build.workspace = true
+vesty-core.workspace = true
+vesty-ipc.workspace = true
+vesty-vst3-sys = { workspace = true, features = ["upstream-vst3"] }
+
+[dev-dependencies]
+tempfile.workspace = true

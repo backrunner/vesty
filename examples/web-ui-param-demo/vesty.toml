@@ -1,0 +1,21 @@
+[plugin]
+name = "Vesty Web UI Demo"
+vendor = "Vesty"
+version = "0.1.0"
+kind = "Fx"
+class_id = "56455354-4957-4542-5549-303030303158"
+
+[ui]
+dir = "ui"
+dev_url = "http://localhost:5173"
+build = "npm run build"
+dist = "dist"
+width = 900
+height = 560
+min_width = 640
+min_height = 420
+
+[package]
+bundle_id = "dev.vesty.web-ui-demo"
+category = "Fx"
+parameter_manifest = "vesty-parameters.json"

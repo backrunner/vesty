@@ -1,0 +1,19 @@
+[package]
+name = "vesty-core"
+description = "Core DSP traits, audio buffers, events, host profiles and plugin state types for Vesty."
+authors.workspace = true
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+vesty-params.workspace = true

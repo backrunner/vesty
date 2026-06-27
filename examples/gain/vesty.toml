@@ -1,0 +1,11 @@
+[plugin]
+name = "Vesty Gain"
+vendor = "Vesty"
+version = "0.1.0"
+kind = "Fx"
+class_id = "56455354-4947-4149-4e30-303030303031"
+
+[package]
+bundle_id = "dev.vesty.gain"
+category = "Fx"
+parameter_manifest = "vesty-parameters.json"

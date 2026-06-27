@@ -1,0 +1,626 @@
+name: ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Linux WebView dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Test workspace
+        run: cargo test --workspace
+
+      - name: Clippy workspace
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test VST3 bindings and wry UI features
+        run: cargo test -p vesty-vst3 --features "vst3-bindings wry-ui"
+
+      - name: Clippy VST3 bindings and wry UI features
+        run: cargo clippy -p vesty-vst3 --all-targets --features "vst3-bindings wry-ui" -- -D warnings
+
+      - name: Test wry backend feature
+        run: cargo test -p vesty-ui-wry --features wry-backend
+
+      - name: Clippy wry backend feature
+        run: cargo clippy -p vesty-ui-wry --all-targets --features wry-backend -- -D warnings
+
+      - name: Generate doctor report
+        shell: bash
+        run: |
+          mkdir -p target/ci-doctor
+          cargo run -p vesty-cli -- doctor --format json > "target/ci-doctor/doctor-${{ runner.os }}.json"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: doctor-${{ runner.os }}
+          path: target/ci-doctor/*.json
+
+      - name: Generate release readiness report
+        shell: bash
+        run: |
+          mkdir -p target/release-check
+          cargo run -p vesty-cli -- release-check \
+            --skip-protocol \
+            --ci-run-url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --format json \
+            --plan "target/release-check/release-action-plan-${{ runner.os }}.json" \
+            --report "target/release-check/release-check-${{ runner.os }}.json" \
+            > /dev/null
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-check-${{ runner.os }}
+          path: target/release-check/*.json
+
+  js:
+    name: js sdk
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install JS dependencies
+        run: npm install
+
+      - name: Typecheck JS SDK
+        run: npm run typecheck
+
+      - name: Test JS SDK
+        run: npm test
+
+      - name: Build JS SDK
+        run: npm run build
+
+      - name: Generate npm pack dry-run report
+        run: |
+          mkdir -p target/npm-pack
+          cargo run -p vesty-cli -- npm-pack --out target/npm-pack/npm-pack.json
+          cargo run -p vesty-cli -- npm-pack --check --out target/npm-pack/npm-pack.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vesty-npm-pack
+          path: target/npm-pack
+
+  protocol:
+    name: protocol export
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Export protocol types and schemas
+        run: cargo run -p vesty-cli -- export-types --out target/vesty-protocol-ci
+
+      - name: Check protocol export is deterministic
+        run: cargo run -p vesty-cli -- export-types --out target/vesty-protocol-ci --check
+
+      - name: Typecheck exported TypeScript
+        run: |
+          npx -y -p typescript@latest tsc \
+            --strict \
+            --noEmit \
+            --target ES2022 \
+            --module ESNext \
+            --moduleResolution Bundler \
+            $(find target/vesty-protocol-ci/typescript -name '*.ts' | sort)
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vesty-protocol
+          path: target/vesty-protocol-ci
+
+  publish-plan:
+    name: publish plan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Generate crate publish plan
+        run: |
+          mkdir -p target/publish-plan
+          cargo run -p vesty-cli -- publish-plan --out target/publish-plan/publish-plan.json
+          cargo run -p vesty-cli -- publish-plan --check --out target/publish-plan/publish-plan.json
+          cargo run -p vesty-cli -- release-order > target/publish-plan/release-order.txt
+
+      - name: Generate crate package readiness report
+        run: |
+          mkdir -p target/crate-package
+          cargo run -p vesty-cli -- crate-package --out target/crate-package/crate-package.json
+          cargo run -p vesty-cli -- crate-package --check --out target/crate-package/crate-package.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vesty-publish-plan
+          path: target/publish-plan
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vesty-crate-package
+          path: target/crate-package
+
+  dependency-baseline:
+    name: dependency baseline
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Check dependency baseline
+        run: |
+          mkdir -p target/dependency-baseline
+          cargo run -p vesty-cli -- dependency-baseline \
+            --out target/dependency-baseline/dependency-baseline.json
+          cargo run -p vesty-cli -- dependency-baseline \
+            --check \
+            --out target/dependency-baseline/dependency-baseline.json
+          cargo run -p vesty-cli -- dependency-baseline \
+            --latest \
+            --out target/dependency-baseline/dependency-baseline-latest.json
+          cargo run -p vesty-cli -- dependency-baseline \
+            --latest \
+            --check \
+            --out target/dependency-baseline/dependency-baseline-latest.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vesty-dependency-baseline
+          path: target/dependency-baseline
+
+  vst3-sdk:
+    name: vst3 sdk generated bindings inputs
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Generate optional VST3 SDK generated bindings inputs
+        shell: bash
+        run: |
+          mkdir -p target/vst3-sdk
+          if [ -n "${VESTY_VST3_SDK_DIR:-}" ] && [ -d "${VESTY_VST3_SDK_DIR}" ]; then
+            cargo run -p vesty-cli -- vst3-sdk manifest \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --out target/vst3-sdk/vst3-sdk-headers.json
+            cargo run -p vesty-cli -- vst3-sdk manifest \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --out target/vst3-sdk/vst3-sdk-headers.json \
+              --check
+            cargo run -p vesty-cli -- vst3-sdk binding-plan \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --bindings-module target/vst3-sdk/generated.rs \
+              --out target/vst3-sdk/generated-bindings-plan.json
+            cargo run -p vesty-cli -- vst3-sdk binding-plan \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --bindings-module target/vst3-sdk/generated.rs \
+              --out target/vst3-sdk/generated-bindings-plan.json \
+              --check
+            cargo run -p vesty-cli -- vst3-sdk binding-surface \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --out target/vst3-sdk/generated-bindings-surface.json
+            cargo run -p vesty-cli -- vst3-sdk binding-surface \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --out target/vst3-sdk/generated-bindings-surface.json \
+              --check
+            cargo run -p vesty-cli -- vst3-sdk emit-scaffold \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --out target/vst3-sdk/generated.rs
+            cargo run -p vesty-cli -- vst3-sdk emit-scaffold \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --out target/vst3-sdk/generated.rs \
+              --check
+            cargo run -p vesty-cli -- vst3-sdk emit-abi-seed \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --out target/vst3-sdk/generated-abi-seed.rs
+            cargo run -p vesty-cli -- vst3-sdk emit-abi-seed \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --out target/vst3-sdk/generated-abi-seed.rs \
+              --check
+            cargo run -p vesty-cli -- vst3-sdk emit-abi \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --out target/vst3-sdk/generated-abi.rs
+            cargo run -p vesty-cli -- vst3-sdk emit-abi \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --out target/vst3-sdk/generated-abi.rs \
+              --check
+            cargo run -p vesty-cli -- vst3-sdk emit-interface-skeleton \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --out target/vst3-sdk/generated-interface-skeleton.rs
+            cargo run -p vesty-cli -- vst3-sdk emit-interface-skeleton \
+              --sdk-dir "${VESTY_VST3_SDK_DIR}" \
+              --out target/vst3-sdk/generated-interface-skeleton.rs \
+              --check
+          else
+            printf '%s\n' "VESTY_VST3_SDK_DIR not set; upstream vst3 crate backend remains active" \
+              > target/vst3-sdk/README.txt
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vesty-vst3-sdk-headers
+          path: target/vst3-sdk
+          if-no-files-found: ignore
+
+  smoke-host:
+    name: headless smoke host
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Build Web UI demo assets
+        run: npm run build --prefix examples/web-ui-param-demo/ui
+
+      - name: Generate headless smoke-host report
+        shell: bash
+        run: |
+          mkdir -p target/smoke-host
+          {
+            printf '%s\n' '{"type":"param.begin","result":0}'
+            printf '%s\n' '{"type":"param.perform","result":0}'
+            printf '%s\n' '{"type":"param.end","result":0}'
+            printf '%s\n' 'result=0'
+          } > target/smoke-host/bridge-trace.log
+          printf '%s\n' 'meter_flush sent=1' > target/smoke-host/meter.log
+          cargo run -p vesty-cli -- smoke-host \
+            --bridge-trace target/smoke-host/bridge-trace.log \
+            --meter-log target/smoke-host/meter.log \
+            --out target/smoke-host/smoke-host.json \
+            --strict
+          cargo run -p vesty-cli -- smoke-host \
+            --bridge-trace target/smoke-host/bridge-trace.log \
+            --meter-log target/smoke-host/meter.log \
+            --out target/smoke-host/smoke-host.json \
+            --check \
+            --strict
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vesty-smoke-host
+          path: target/smoke-host
+
+  scaffold:
+    name: scaffold smoke (${{ matrix.ui }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ui: [none, vanilla, react, vue, svelte]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Linux WebView dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Generate local path scaffold
+        env:
+          UI_TEMPLATE: ${{ matrix.ui }}
+        run: |
+          rm -rf target/ci-scaffold
+          mkdir -p target/ci-scaffold
+          cd target/ci-scaffold
+          cargo run -p vesty-cli -- new "demo-${UI_TEMPLATE}" \
+            --ui "${UI_TEMPLATE}" \
+            --vesty-path "$GITHUB_WORKSPACE/crates/vesty" \
+            --plugin-ui-path "$GITHUB_WORKSPACE/packages/plugin-ui"
+
+      - name: Check generated Rust plugin
+        env:
+          UI_TEMPLATE: ${{ matrix.ui }}
+        run: cargo check --manifest-path "target/ci-scaffold/demo-${UI_TEMPLATE}/Cargo.toml"
+
+      - name: Build generated Web UI
+        if: matrix.ui != 'none'
+        env:
+          UI_TEMPLATE: ${{ matrix.ui }}
+        run: |
+          npm install --prefix "target/ci-scaffold/demo-${UI_TEMPLATE}/ui"
+          npm run build --prefix "target/ci-scaffold/demo-${UI_TEMPLATE}/ui"
+          npm run typecheck --prefix "target/ci-scaffold/demo-${UI_TEMPLATE}/ui"
+
+  package:
+    name: package smoke (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            os: ubuntu-latest
+            platform: linux-x64
+            artifact: linux-vst3-static-validate
+            binary_prefix: lib
+            binary_ext: so
+          - name: macOS
+            os: macos-latest
+            platform: macos
+            artifact: macos-vst3-static-validate
+            binary_prefix: lib
+            binary_ext: dylib
+          - name: Windows x64
+            os: windows-latest
+            platform: windows-x64
+            artifact: windows-vst3-static-validate
+            binary_prefix: ""
+            binary_ext: dll
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Linux WebView dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev \
+            pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Build web UI demo assets
+        run: npm run build --prefix examples/web-ui-param-demo/ui
+
+      - name: Check example parameter sidecars
+        shell: bash
+        run: |
+          cargo run -p vesty-cli -- param-manifest \
+            --specs examples/gain/params.specs.json \
+            --out examples/gain/vesty-parameters.json \
+            --check
+          cargo run -p vesty-cli -- param-manifest \
+            --specs examples/web-ui-param-demo/params.specs.json \
+            --out examples/web-ui-param-demo/vesty-parameters.json \
+            --check
+          cargo run -p vesty-cli -- param-manifest \
+            --specs examples/midi-synth/params.specs.json \
+            --out examples/midi-synth/vesty-parameters.json \
+            --check
+
+      - name: Build example plugins
+        shell: bash
+        run: |
+          cargo build \
+            -p vesty-example-gain \
+            -p vesty-example-web-ui-param-demo \
+            -p vesty-example-midi-synth \
+            --release
+
+      - name: Package example VST3 bundles
+        shell: bash
+        env:
+          VESTY_PLATFORM: ${{ matrix.platform }}
+          BINARY_PREFIX: ${{ matrix.binary_prefix }}
+          BINARY_EXT: ${{ matrix.binary_ext }}
+        run: |
+          GAIN_BINARY="target/release/${BINARY_PREFIX}vesty_example_gain.${BINARY_EXT}"
+          WEB_UI_BINARY="target/release/${BINARY_PREFIX}vesty_example_web_ui_param_demo.${BINARY_EXT}"
+          MIDI_SYNTH_BINARY="target/release/${BINARY_PREFIX}vesty_example_midi_synth.${BINARY_EXT}"
+          cargo run -p vesty-cli -- package \
+            --config examples/gain/vesty.toml \
+            --platform "${VESTY_PLATFORM}" \
+            --binary "${GAIN_BINARY}" \
+            --out target/ci-package
+          cargo run -p vesty-cli -- package \
+            --config examples/web-ui-param-demo/vesty.toml \
+            --platform "${VESTY_PLATFORM}" \
+            --binary "${WEB_UI_BINARY}" \
+            --out target/ci-package
+          cargo run -p vesty-cli -- package \
+            --config examples/midi-synth/vesty.toml \
+            --platform "${VESTY_PLATFORM}" \
+            --binary "${MIDI_SYNTH_BINARY}" \
+            --out target/ci-package
+
+      - name: Static validate packaged bundles
+        shell: bash
+        run: |
+          cargo run -p vesty-cli -- validate \
+            target/ci-package/VestyGain.vst3 \
+            --static-only \
+            --strict \
+            --format json \
+            --report target/ci-package/VestyGain.validate.json
+          cargo run -p vesty-cli -- validate \
+            target/ci-package/VestyWebUIDemo.vst3 \
+            --static-only \
+            --strict \
+            --format json \
+            --report target/ci-package/VestyWebUIDemo.validate.json
+          cargo run -p vesty-cli -- validate \
+            target/ci-package/VestyMIDISynth.vst3 \
+            --static-only \
+            --strict \
+            --format json \
+            --report target/ci-package/VestyMIDISynth.validate.json
+          cargo run -p vesty-cli -- release-check \
+            --skip-protocol \
+            --static-validate-report target/ci-package/VestyGain.validate.json \
+            --static-validate-report target/ci-package/VestyWebUIDemo.validate.json \
+            --static-validate-report target/ci-package/VestyMIDISynth.validate.json \
+            --format json \
+            --report target/ci-package/static-validate-release-check.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            target/ci-package/*.vst3
+            target/ci-package/*.json
+
+  release-evidence:
+    name: release evidence snapshot
+    runs-on: ubuntu-latest
+    needs: [rust, js, protocol, publish-plan, dependency-baseline, vst3-sdk, package]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Initialize release evidence directory
+        run: |
+          cargo run -p vesty-cli -- release-evidence collect-local \
+            --dir target/release-evidence \
+            --no-protocol \
+            --no-publish-plan \
+            --no-npm-pack
+
+      - name: Download doctor artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: doctor-*
+          path: target/downloaded-artifacts/ci-doctor
+          merge-multiple: true
+
+      - name: Download package validate artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: "*-vst3-static-validate"
+          path: target/downloaded-artifacts/package
+
+      - name: Download protocol snapshot
+        uses: actions/download-artifact@v8
+        with:
+          name: vesty-protocol
+          path: target/downloaded-artifacts/vesty-protocol
+
+      - name: Download publish plan
+        uses: actions/download-artifact@v8
+        with:
+          name: vesty-publish-plan
+          path: target/downloaded-artifacts/vesty-publish-plan
+
+      - name: Download crate package readiness report
+        uses: actions/download-artifact@v8
+        with:
+          name: vesty-crate-package
+          path: target/downloaded-artifacts/vesty-crate-package
+
+      - name: Download npm pack report
+        uses: actions/download-artifact@v8
+        with:
+          name: vesty-npm-pack
+          path: target/downloaded-artifacts/vesty-npm-pack
+
+      - name: Download dependency baseline report
+        uses: actions/download-artifact@v8
+        with:
+          name: vesty-dependency-baseline
+          path: target/downloaded-artifacts/vesty-dependency-baseline
+
+      - name: Download optional VST3 SDK generated bindings inputs
+        uses: actions/download-artifact@v8
+        with:
+          name: vesty-vst3-sdk-headers
+          path: target/downloaded-artifacts/vst3-sdk
+
+      - name: Download per-OS release-check snapshots
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-check-*
+          path: target/downloaded-artifacts/ci-release-checks
+          merge-multiple: true
+
+      - name: Generate consolidated release evidence report
+        shell: bash
+        run: |
+          cargo run -p vesty-cli -- release-evidence import-ci \
+            --source target/downloaded-artifacts \
+            --dir target/release-evidence \
+            --ci-run-url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --no-template \
+            --format json \
+            > target/release-evidence/import-ci.stdout.json
+          cargo run -p vesty-cli -- release-check \
+            --release-evidence-dir target/release-evidence \
+            --protocol-snapshot target/release-evidence/vesty-protocol \
+            --format json \
+            --report target/release-evidence/release-check-consolidated.json \
+            > /dev/null
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-consolidated
+          path: target/release-evidence

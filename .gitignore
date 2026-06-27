@@ -1,0 +1,6 @@
+/target/
+/.DS_Store
+**/*.vst3/
+node_modules/
+dist/
+

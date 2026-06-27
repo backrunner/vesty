@@ -1,0 +1,47 @@
+{
+  "name": "@vesty/react",
+  "version": "0.1.0",
+  "description": "React hooks and provider for the Vesty WebView plugin UI bridge.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/orchiliao/vesty.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://github.com/orchiliao/vesty#readme",
+  "keywords": [
+    "vst3",
+    "audio-plugin",
+    "react",
+    "webview",
+    "vesty"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node tests/exports.test.mjs"
+  },
+  "peerDependencies": {
+    "@vesty/plugin-ui": "0.1.x",
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@vesty/plugin-ui": "0.1.0",
+    "react": "latest",
+    "typescript": "^6.0.3"
+  }
+}

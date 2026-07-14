@@ -131,15 +131,15 @@ enum Commands {
         format: String,
     },
     DawMatrix {
-        #[arg(long, default_value = "target/reaper-smoke")]
+        #[arg(long, default_value = "target/daw-evidence/reaper")]
         reaper_evidence: Utf8PathBuf,
-        #[arg(long, default_value = "target/cubase-smoke")]
+        #[arg(long, default_value = "target/daw-evidence/cubase")]
         cubase_evidence: Utf8PathBuf,
-        #[arg(long, default_value = "target/bitwig-smoke")]
+        #[arg(long, default_value = "target/daw-evidence/bitwig")]
         bitwig_evidence: Utf8PathBuf,
-        #[arg(long, default_value = "target/ableton-smoke")]
+        #[arg(long, default_value = "target/daw-evidence/ableton")]
         ableton_evidence: Utf8PathBuf,
-        #[arg(long, default_value = "target/studio-one-smoke")]
+        #[arg(long, default_value = "target/daw-evidence/studio-one")]
         studio_one_evidence: Utf8PathBuf,
         #[arg(long)]
         evidence_root: Option<Utf8PathBuf>,
@@ -186,15 +186,15 @@ enum Commands {
         command: ReleaseEvidenceCommand,
     },
     ReleaseCheck {
-        #[arg(long, default_value = "target/reaper-smoke")]
+        #[arg(long, default_value = "target/daw-evidence/reaper")]
         reaper_evidence: Utf8PathBuf,
-        #[arg(long, default_value = "target/cubase-smoke")]
+        #[arg(long, default_value = "target/daw-evidence/cubase")]
         cubase_evidence: Utf8PathBuf,
-        #[arg(long, default_value = "target/bitwig-smoke")]
+        #[arg(long, default_value = "target/daw-evidence/bitwig")]
         bitwig_evidence: Utf8PathBuf,
-        #[arg(long, default_value = "target/ableton-smoke")]
+        #[arg(long, default_value = "target/daw-evidence/ableton")]
         ableton_evidence: Utf8PathBuf,
-        #[arg(long, default_value = "target/studio-one-smoke")]
+        #[arg(long, default_value = "target/daw-evidence/studio-one")]
         studio_one_evidence: Utf8PathBuf,
         #[arg(long)]
         evidence_root: Option<Utf8PathBuf>,
@@ -6838,7 +6838,7 @@ fn run_npm_pack(
     }
 
     let raw_report = npm_pack_dry_run_json(workspace)?;
-    let entries = parse_npm_pack_report_text(&raw_report)?;
+    let entries = parse_npm_pack_command_output(&raw_report)?;
     let evidence = validate_npm_pack_entries(&entries)?;
     let report_text = serde_json::to_string_pretty(&entries)? + "\n";
     if let Some(path) = out {
@@ -6853,8 +6853,8 @@ const DEPENDENCY_BASELINE_COVERAGE_CHECK_NAME: &str =
     "cargo workspace external dependency baseline coverage";
 const DEPENDENCY_BASELINE_MAX_CHECKS: usize = 256;
 const DEPENDENCY_BASELINE_HINT_MAX_BYTES: usize = 64 * 1024;
-const TYPESCRIPT_BASELINE_RANGE: &str = "^6.0.3";
-const TYPESCRIPT_BASELINE_LOCK_VERSION: &str = "6.0.3";
+const TYPESCRIPT_BASELINE_RANGE: &str = "^7.0.2";
+const TYPESCRIPT_BASELINE_LOCK_VERSION: &str = "7.0.2";
 const REQUIRED_JS_BASELINE_PACKAGES: &[&str] = &["plugin-ui", "react", "vue", "svelte"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -6886,20 +6886,20 @@ const REQUIRED_JS_LATEST_BASELINE_DEPENDENCIES: &[JsLatestBaselineDependency] = 
         dependency: "vue",
         node_package_path: "node_modules/vue",
         expected_range: "latest",
-        expected_lock_version: "3.5.38",
+        expected_lock_version: "3.5.39",
     },
     JsLatestBaselineDependency {
         workspace_package: "svelte",
         dependency: "svelte",
         node_package_path: "node_modules/svelte",
         expected_range: "latest",
-        expected_lock_version: "5.56.3",
+        expected_lock_version: "5.56.5",
     },
 ];
 const REQUIRED_RUST_BASELINE_DEPENDENCIES: &[(&str, &str)] = &[
-    ("arc-swap", "1.9.1"),
+    ("arc-swap", "1.9.2"),
     ("atomic_float", "1.1.0"),
-    ("camino", "1.2.2"),
+    ("camino", "1.2.4"),
     ("cargo_metadata", "0.23.1"),
     ("wry", "0.55.1"),
     ("vst3", vesty_vst3_sys::UPSTREAM_VST3_CRATE_BASELINE),
@@ -6910,13 +6910,13 @@ const REQUIRED_RUST_BASELINE_DEPENDENCIES: &[(&str, &str)] = &[
     ("ts-rs", "12.0.1"),
     ("clap", "4.6.1"),
     ("mime_guess", "2.0.5"),
-    ("plist", "1.9.0"),
+    ("plist", "1.10.0"),
     ("proc-macro-crate", "3.5.0"),
     ("proc-macro2", "1.0.106"),
-    ("quote", "1.0.45"),
+    ("quote", "1.0.46"),
     ("schemars", "1.2.1"),
-    ("syn", "2.0.117"),
-    ("toml", "1.1.2"),
+    ("syn", "2.0.118"),
+    ("toml", "1.1.3"),
     ("sha2", "0.11.0"),
     ("tempfile", "3.27.0"),
     ("thiserror", "2.0.18"),
@@ -7266,7 +7266,7 @@ fn rust_registry_latest_expected(name: &str, manifest_expected: &str) -> String 
     match name {
         // Cargo dependency requirements ignore SemVer build metadata, but crates.io
         // exposes toml's current release with the spec marker in the version string.
-        "toml" => "1.1.2+spec-1.1.0".to_string(),
+        "toml" => "1.1.3+spec-1.1.0".to_string(),
         _ => manifest_expected.to_string(),
     }
 }
@@ -11803,6 +11803,19 @@ struct NpmPackFile {
     path: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct NpmPackCommandEntry {
+    name: String,
+    version: String,
+    filename: String,
+    files: Vec<NpmPackCommandFile>,
+}
+
+#[derive(Debug, Deserialize)]
+struct NpmPackCommandFile {
+    path: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct NpmPackEvidence {
     package_count: usize,
@@ -11968,6 +11981,26 @@ fn expected_dependency_latest_check_names() -> BTreeSet<String> {
 fn parse_npm_pack_report_text(text: &str) -> Result<Vec<NpmPackEntry>, Box<dyn std::error::Error>> {
     serde_json::from_str::<Vec<NpmPackEntry>>(text)
         .map_err(|error| format!("invalid npm pack report JSON: {error}").into())
+}
+
+fn parse_npm_pack_command_output(
+    text: &str,
+) -> Result<Vec<NpmPackEntry>, Box<dyn std::error::Error>> {
+    let entries = serde_json::from_str::<Vec<NpmPackCommandEntry>>(text)
+        .map_err(|error| format!("invalid npm pack command JSON: {error}"))?;
+    Ok(entries
+        .into_iter()
+        .map(|entry| NpmPackEntry {
+            name: entry.name,
+            version: entry.version,
+            filename: entry.filename,
+            files: entry
+                .files
+                .into_iter()
+                .map(|file| NpmPackFile { path: file.path })
+                .collect(),
+        })
+        .collect())
 }
 
 fn validate_npm_pack_entries(
@@ -21050,7 +21083,7 @@ function clampNormalized(value: unknown, fallback = PARAM_DEFAULT) {
 }
 
 function normalizedFromReady(ready: BridgeReadyPayload) {
-  return clampNormalized(ready.params.find((param) => param.id === PARAM_ID)?.defaultNormalized);
+  return clampNormalized(ready.paramValues.find((param) => param.id === PARAM_ID)?.normalized);
 }
 
 function setNormalized(normalized: number) {
@@ -21128,7 +21161,7 @@ function clampNormalized(value: unknown, fallback = PARAM_DEFAULT) {
 }
 
 function normalizedFromReady(ready: BridgeReadyPayload) {
-  return clampNormalized(ready.params.find((param) => param.id === PARAM_ID)?.defaultNormalized);
+  return clampNormalized(ready.paramValues.find((param) => param.id === PARAM_ID)?.normalized);
 }
 
 export function App() {
@@ -21252,7 +21285,7 @@ function clampNormalized(value: unknown, fallback = PARAM_DEFAULT) {
 }
 
 function normalizedFromReady(ready: BridgeReadyPayload) {
-  return clampNormalized(ready.params.find((param) => param.id === PARAM_ID)?.defaultNormalized);
+  return clampNormalized(ready.paramValues.find((param) => param.id === PARAM_ID)?.normalized);
 }
 
 onMounted(async () => {
@@ -21352,7 +21385,7 @@ fn ui_svelte_app(param: UiParamTemplate) -> String {
   }
 
   function normalizedFromReady(ready: BridgeReadyPayload) {
-    return clampNormalized(ready.params.find((param) => param.id === PARAM_ID)?.defaultNormalized);
+    return clampNormalized(ready.paramValues.find((param) => param.id === PARAM_ID)?.normalized);
   }
 
   onMount(async () => {
@@ -23750,6 +23783,65 @@ mod tests {
                 assert_eq!(format, "json");
             }
             _ => panic!("expected validate command"),
+        }
+    }
+
+    #[test]
+    fn daw_commands_share_release_action_default_evidence_layout() {
+        for command in ["daw-matrix", "release-check"] {
+            let cli = Cli::try_parse_from(["vesty", command]).unwrap();
+            let (
+                reaper_evidence,
+                cubase_evidence,
+                bitwig_evidence,
+                ableton_evidence,
+                studio_one_evidence,
+            ) = match cli.command {
+                Commands::DawMatrix {
+                    reaper_evidence,
+                    cubase_evidence,
+                    bitwig_evidence,
+                    ableton_evidence,
+                    studio_one_evidence,
+                    ..
+                }
+                | Commands::ReleaseCheck {
+                    reaper_evidence,
+                    cubase_evidence,
+                    bitwig_evidence,
+                    ableton_evidence,
+                    studio_one_evidence,
+                    ..
+                } => (
+                    reaper_evidence,
+                    cubase_evidence,
+                    bitwig_evidence,
+                    ableton_evidence,
+                    studio_one_evidence,
+                ),
+                _ => panic!("expected DAW evidence command"),
+            };
+
+            assert_eq!(
+                reaper_evidence,
+                Utf8PathBuf::from("target/daw-evidence/reaper")
+            );
+            assert_eq!(
+                cubase_evidence,
+                Utf8PathBuf::from("target/daw-evidence/cubase")
+            );
+            assert_eq!(
+                bitwig_evidence,
+                Utf8PathBuf::from("target/daw-evidence/bitwig")
+            );
+            assert_eq!(
+                ableton_evidence,
+                Utf8PathBuf::from("target/daw-evidence/ableton")
+            );
+            assert_eq!(
+                studio_one_evidence,
+                Utf8PathBuf::from("target/daw-evidence/studio-one")
+            );
         }
     }
 
@@ -26428,6 +26520,40 @@ Result: 47 tests passed, 0 tests failed
     }
 
     #[test]
+    fn npm_pack_command_output_normalizes_external_metadata() {
+        let command_output = r#"[
+          {
+            "id": "@vesty/plugin-ui@0.1.0",
+            "name": "@vesty/plugin-ui",
+            "version": "0.1.0",
+            "size": 1024,
+            "unpackedSize": 4096,
+            "shasum": "abc",
+            "integrity": "sha512-abc",
+            "filename": "vesty-plugin-ui-0.1.0.tgz",
+            "files": [
+              { "path": "package.json", "size": 512, "mode": 420 },
+              { "path": "dist/index.js", "size": 512, "mode": 420 }
+            ],
+            "entryCount": 2,
+            "bundled": []
+          }
+        ]"#;
+
+        let entries = parse_npm_pack_command_output(command_output).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "@vesty/plugin-ui");
+        assert_eq!(entries[0].files.len(), 2);
+        assert_eq!(entries[0].files[1].path, "dist/index.js");
+
+        let normalized = serde_json::to_value(entries).unwrap();
+        assert_eq!(normalized[0]["name"], "@vesty/plugin-ui");
+        assert_eq!(normalized[0]["files"][0]["path"], "package.json");
+        assert!(normalized[0].get("id").is_none());
+        assert!(normalized[0]["files"][0].get("mode").is_none());
+    }
+
+    #[test]
     fn publish_crate_and_npm_reports_reject_malformed_shape_fields() {
         let mut unsafe_skipped = test_publish_plan();
         unsafe_skipped
@@ -26596,8 +26722,8 @@ Result: 47 tests passed, 0 tests failed
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "npm lockfile `typescript` installed version"
-                && check.expected == "6.0.3"
-                && check.actual.as_deref() == Some("6.0.3")
+                && check.expected == "7.0.2"
+                && check.actual.as_deref() == Some("7.0.2")
         }));
     }
 
@@ -26690,8 +26816,8 @@ unreviewed = "9.9.9"
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "npm registry latest `typescript`"
-                && check.expected == "6.0.3"
-                && check.actual.as_deref() == Some("6.0.3")
+                && check.expected == "7.0.2"
+                && check.actual.as_deref() == Some("7.0.2")
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "npm registry latest `react`"
@@ -26705,13 +26831,13 @@ unreviewed = "9.9.9"
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "npm registry latest `vue`"
-                && check.expected == "3.5.38"
-                && check.actual.as_deref() == Some("3.5.38")
+                && check.expected == "3.5.39"
+                && check.actual.as_deref() == Some("3.5.39")
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "npm registry latest `svelte`"
-                && check.expected == "5.56.3"
-                && check.actual.as_deref() == Some("5.56.3")
+                && check.expected == "5.56.5"
+                && check.actual.as_deref() == Some("5.56.5")
         }));
 
         let temp = tempfile::tempdir().unwrap();
@@ -37397,10 +37523,10 @@ bridge timeout
         fn assert_ready_param_binding(source: &str) {
             assert!(source.contains("type BridgeReadyPayload"));
             assert!(source.contains("type ParamChangedEvent"));
-            assert!(source.contains("defaultNormalized"));
+            assert!(source.contains("paramValues"));
             assert!(
                 source.contains(
-                    "ready.params.find((param) => param.id === PARAM_ID)?.defaultNormalized"
+                    "ready.paramValues.find((param) => param.id === PARAM_ID)?.normalized"
                 ),
                 "{source}"
             );

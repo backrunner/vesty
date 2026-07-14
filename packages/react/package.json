@@ -42,6 +42,6 @@
     "@types/react": "latest",
     "@vesty/plugin-ui": "0.1.0",
     "react": "latest",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }

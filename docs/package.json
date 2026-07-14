@@ -1,0 +1,33 @@
+{
+  "name": "docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "svedocs dev",
+    "build": "svedocs build --no-og",
+    "build:edge": "svedocs build --mode edge --no-og",
+    "build:static": "svedocs build --mode static --no-og",
+    "build:ssg": "svedocs ssg",
+    "build:spa": "svedocs build --mode spa",
+    "preview": "svedocs preview",
+    "check": "svedocs check"
+  },
+  "dependencies": {
+    "@sveltejs/adapter-cloudflare": "^7.2.8",
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/kit": "^2.60.1",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@tailwindcss/vite": "^4.3.0",
+    "svelte": "^5.55.7",
+    "svedocs": "link:../../svedocs/packages/svedocs",
+    "tailwindcss": "^4.3.0",
+    "vite": "^8.0.13"
+  },
+  "devDependencies": {
+    "svedocs-cli": "link:../../svedocs/packages/cli",
+    "@types/node": "^25.8.0",
+    "typescript": "^6.0.3"
+  },
+  "packageManager": "pnpm@11.10.0"
+}

@@ -16,3 +16,13 @@ coverage/
 *.log
 *.tmp
 *.swp
+
+# Local browser and review artifacts
+/.playwright-cli/
+/output/
+
+# SvelteKit documentation site artifacts
+/docs/.svelte-kit/
+/docs/build/
+/docs/.wrangler/
+/docs/static/og/

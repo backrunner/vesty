@@ -61,9 +61,16 @@ Repository commits should be authored as:
 BackRunner <dev@backrunner.top>
 ```
 
+Before committing, verify the repository-local identity:
+
+```bash
+git config user.name BackRunner
+git config user.email dev@backrunner.top
+```
+
 ## Commit Convention
 
-Use this format:
+All human- and agent-authored commits must use this format:
 
 ```text
 xxx(comp): desc

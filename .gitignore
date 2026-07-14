@@ -1,6 +1,18 @@
 /target/
-/.DS_Store
-**/*.vst3/
+
+# JavaScript build and dependency artifacts
 node_modules/
 dist/
+coverage/
 
+# Packaged plugins and local release artifacts
+*.vst3
+
+# Local environment and editor files
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+*.tmp
+*.swp

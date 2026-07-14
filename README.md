@@ -2,44 +2,53 @@
 
 Vesty is a Rust-first framework for building VST3 audio plugins with realtime-safe DSP and system WebView user interfaces.
 
-The project keeps plugin audio code native and deterministic while letting editor UIs use ordinary web tooling. The MVP target is VST3, with `wry` used directly for system WebView embedding. Vesty does not use Tauri.
+Audio processing stays native and deterministic. Plugin editors can use ordinary JavaScript, React, Vue, or Svelte without adding Tauri to the plugin runtime.
 
-## Status
+> Vesty is alpha software. The core framework and local validation tools are implemented, but release readiness still requires real DAW, platform WebView, Steinberg validator, signing, and notarization evidence.
 
-Vesty is an alpha framework skeleton. The workspace currently includes:
+## What It Provides
 
-- Rust plugin traits, process contexts, audio buffer APIs, host/profile metadata, and plugin state types.
-- Typed parameters, normalized/plain conversion, smoothing, handles, schema export, and stable VST3 parameter IDs.
-- Realtime queues, fixed event lists, allocation guards, and audio-thread safety checks.
-- VST3 adapter code, binding baseline utilities, packaging helpers, validators, and release-evidence tooling.
-- A typed JSBridge, bridge state store, subscriptions, diagnostics, logs, meters, and framework-agnostic UI runtime traits.
-- A CLI named `vesty` for scaffolding, building, packaging, validation, protocol export, manifest generation, evidence collection, and release checks.
-- npm packages under the `@vesty/*` scope for framework-agnostic, React, Vue, and Svelte WebView UI integration.
-- Example plugins for gain, MIDI synth, and a web UI parameter demo.
+- Rust traits and process contexts for audio effects and instruments.
+- Typed parameters with stable VST3 IDs and realtime-safe handles.
+- Fixed-capacity events, lock-free queues, meters, and diagnostics.
+- VST3 factory, processor, controller, state, automation, and editor integration.
+- A typed JSBridge with generated TypeScript protocol definitions.
+- Direct system WebView embedding through `wry`.
+- A `vesty` CLI for scaffolding, building, packaging, validation, and release checks.
+- Gain, MIDI synth, and Web UI example plugins.
 
-Release readiness still requires external evidence beyond unit tests, including real DAW smoke tests, platform WebView checks, Steinberg validator output, signing verification, CI artifacts, and macOS notarization/stapling logs.
+## Quick Start
 
-## Repository Layout
+Requirements:
 
-- `crates/vesty`: facade crate and public prelude.
-- `crates/vesty-core`: plugin traits, audio buffers, events, state, UI descriptors, and host profiles.
-- `crates/vesty-params`: typed parameters, conversion, smoothing, handles, schema export, and stable VST3 IDs.
-- `crates/vesty-rt`: realtime-safe queues, fixed event lists, and allocation guards.
-- `crates/vesty-vst3`: host-facing VST3 adapter.
-- `crates/vesty-vst3-sys`: VST3 binding baseline, SDK probes, ABI metadata, and generated-binding planning helpers.
-- `crates/vesty-ipc`: JSBridge packets and TypeScript/JSON schema exports.
-- `crates/vesty-bridge`: bridge state store, routing, subscriptions, backpressure, gestures, meters, logs, and diagnostics.
-- `crates/vesty-ui`: host-agnostic UI runtime traits.
-- `crates/vesty-ui-wry`: system WebView runtime built on `wry`.
-- `crates/vesty-build`: `vesty.toml`, UI asset manifests, VST3 bundle packaging, and static validation.
-- `crates/vesty-cli`: the `vesty` command-line tool.
-- `crates/vesty-macros`: derive macros for plugin ergonomics.
-- `packages/plugin-ui`: framework-agnostic JavaScript bridge SDK.
-- `packages/react`, `packages/vue`, `packages/svelte`: thin adapters over `@vesty/plugin-ui`.
-- `examples/gain`, `examples/midi-synth`, `examples/web-ui-param-demo`: sample plugins and UI flows.
-- `.agents`: deeper project research, architecture notes, implementation status, and completion audit references.
+- Rust 1.95 or newer
+- Node.js 24 or newer for the UI packages
+- Platform WebView development libraries when enabling the `wry` backend
 
-## Minimal Plugin Shape
+```bash
+git clone https://github.com/orchiliao/vesty.git
+cd vesty
+
+cargo test --workspace
+npm install
+npm test
+```
+
+Build the example plugins:
+
+```bash
+cargo build \
+  -p vesty-example-gain \
+  -p vesty-example-midi-synth \
+  -p vesty-example-web-ui-param-demo \
+  --release
+
+npm run build --prefix examples/web-ui-param-demo/ui
+```
+
+Use `cargo run -p vesty-cli -- --help` to inspect the available project, package, validation, and release commands.
+
+## Minimal Plugin
 
 ```rust
 use vesty::prelude::*;
@@ -113,26 +122,16 @@ impl AudioKernel for MyKernel {
 vesty::export_vst3!(MyPlugin);
 ```
 
-## Web UI Model
+The audio `process` path must not allocate, lock, block, perform JSON work, call WebView APIs, or format logs.
 
-Vesty Web UIs communicate with Rust through a typed JSBridge:
+## Repository Layout
 
-- JS to Rust: `window.ipc.postMessage(JSON.stringify(packet))`.
-- Rust to JS: UI-thread script evaluation with batched delivery.
-- State is snapshot + revision + typed commands.
-- Parameters are host/controller authoritative.
-- Meters and analyzers are latest-wins streams.
-- Reliable lifecycle/state events use explicit subscriptions.
+- `crates/`: Rust framework, VST3 adapter, WebView runtime, build support, macros, and CLI.
+- `packages/`: `@vesty/plugin-ui` plus React, Vue, and Svelte adapters.
+- `examples/`: example VST3 plugins and Web UI assets.
+- `.agents/`: architecture research, implementation notes, and completion audits.
 
-Use `@vesty/plugin-ui` directly, or one of the React, Vue, and Svelte adapters.
-
-## Realtime Rules
-
-The audio `process` path must not allocate, lock, perform JSON work, touch WebView APIs, format logs, or block. Use the provided atomics, parameter handles, fixed event lists, SPSC queues, and allocation guards to keep realtime boundaries visible.
-
-The default DSP path is f32. Plugins that need true double-precision host processing can set `AudioKernel::SUPPORTS_F64 = true` and implement `process_f64(&mut ProcessContext64)`.
-
-## Local Checks
+## Verification
 
 ```bash
 cargo fmt --all --check
@@ -141,34 +140,20 @@ cargo clippy --workspace --all-targets -- -D warnings
 npm run typecheck
 npm test
 cargo run -p vesty-cli -- export-types --out target/vesty-protocol --check
-cargo run -p vesty-cli -- param-manifest --specs examples/gain/params.specs.json --out examples/gain/vesty-parameters.json --check
-npm run build --prefix examples/web-ui-param-demo/ui
-cargo run -p vesty-cli -- smoke-host --out target/smoke-host/smoke-host.json --check
 ```
 
-`vesty smoke-host` is a local headless framework self-check for example configs, parameter sidecars, Web UI assets, and optional bridge/meter traces. It does not replace real DAW, platform WebView, validator, signing, notarization, or CI evidence.
+These checks validate the repository locally. They do not replace real host and platform release evidence.
 
-## Development Notes
+## Contributing
 
-Agent-facing project rules live in `AGENTS.md`. Additional architecture and audit notes live under `.agents/`.
-
-Commits should use the project convention:
+Project-specific development rules are in `AGENTS.md`. Commit messages use:
 
 ```text
 xxx(comp): desc
 ```
 
-Examples:
-
-- `feat(cli): add release evidence import`
-- `fix(vst3): preserve controller parameter state`
-- `docs(project): update contributor guidance`
+Keep commits focused and use lowercase types and scopes, for example `fix(vst3): preserve sample-accurate automation`.
 
 ## License
 
-Vesty is licensed under either of:
-
-- Apache License, Version 2.0, in `LICENSE-APACHE`
-- MIT license, in `LICENSE-MIT`
-
-at your option.
+Vesty is licensed under the [Apache License 2.0](LICENSE-APACHE).

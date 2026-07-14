@@ -24489,7 +24489,7 @@ Result: 47 tests passed, 0 tests failed
             "categories = [",
             "homepage = \"https://github.com/orchiliao/vesty\"",
             "keywords = [",
-            "license = \"MIT OR Apache-2.0\"",
+            "license = \"Apache-2.0\"",
             "repository = \"https://github.com/orchiliao/vesty\"",
         ] {
             assert!(
@@ -24498,7 +24498,6 @@ Result: 47 tests passed, 0 tests failed
             );
         }
         assert!(root.join("README.md").is_file());
-        assert!(root.join("LICENSE-MIT").is_file());
         assert!(root.join("LICENSE-APACHE").is_file());
         let readme = fs::read_to_string(root.join("README.md")).unwrap();
         for expected in [
@@ -24574,7 +24573,7 @@ Result: 47 tests passed, 0 tests failed
                     .unwrap();
             for expected in [
                 "\"description\":",
-                "\"license\": \"MIT OR Apache-2.0\"",
+                "\"license\": \"Apache-2.0\"",
                 "\"repository\":",
                 "\"homepage\": \"https://github.com/orchiliao/vesty#readme\"",
                 "\"keywords\": [",

@@ -16,6 +16,7 @@ Audio processing stays native and deterministic. Plugin editors can use ordinary
 - Direct system WebView embedding through `wry`.
 - A `vesty` CLI for scaffolding, building, packaging, validation, and release checks.
 - Gain, MIDI synth, and Web UI example plugins.
+- A multilingual Svedocs documentation site and companion AI development skill.
 
 ## Quick Start
 
@@ -47,6 +48,10 @@ npm run build --prefix examples/web-ui-param-demo/ui
 ```
 
 Use `cargo run -p vesty-cli -- --help` to inspect the available project, package, validation, and release commands.
+
+The complete English and Simplified Chinese guides live in [`docs/`](docs/). Start with the [complete plugin tutorial](docs/content/docs/guides/complete-plugin.md) for the path from scaffold to validated VST3 bundle.
+
+AI-assisted workflows can use the repository-distributed [`vesty-plugin-dev`](skills/vesty-plugin-dev/SKILL.md) skill. Its instructions preserve realtime boundaries and distinguish local checks from external release evidence.
 
 ## Minimal Plugin
 
@@ -129,6 +134,8 @@ The audio `process` path must not allocate, lock, block, perform JSON work, call
 - `crates/`: Rust framework, VST3 adapter, WebView runtime, build support, macros, and CLI.
 - `packages/`: `@vesty/plugin-ui` plus React, Vue, and Svelte adapters.
 - `examples/`: example VST3 plugins and Web UI assets.
+- `docs/`: multilingual Svedocs site, tutorials, guides, and references.
+- `skills/`: installable AI development workflows for Vesty projects.
 - `.agents/`: architecture research, implementation notes, and completion audits.
 
 ## Verification

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vesty Plugin Development"
+  short_description: "Build and verify Vesty VST3 plugins with AI"
+  default_prompt: "Use $vesty-plugin-dev to build a realtime-safe Vesty VST3 plugin."

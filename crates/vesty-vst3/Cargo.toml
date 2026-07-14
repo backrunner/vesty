@@ -30,6 +30,7 @@ thiserror.workspace = true
 vesty-core.workspace = true
 vesty-bridge = { workspace = true, optional = true }
 vesty-ipc = { workspace = true, optional = true }
+vesty-macros.workspace = true
 vesty-ui = { workspace = true, optional = true }
 vesty-ui-wry = { workspace = true, optional = true }
 vesty-params.workspace = true

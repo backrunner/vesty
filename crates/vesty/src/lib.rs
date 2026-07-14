@@ -19,7 +19,7 @@ pub mod prelude {
     pub use crate::rt::{QueueId, RtLogEvent, RtLogLevel};
     pub use crate::{
         AudioBuffers, AudioBuffers64, AudioKernel, AudioOutputBus, Event, HostChangeFlags,
-        HostProfile, HostQuirk, HostQuirkArea, HostQuirkSeverity, KernelInit,
+        HostProfile, HostQuirk, HostQuirkArea, HostQuirkSeverity, InstrumentKernel, KernelInit,
         MAX_AUDIO_OUTPUT_BUSES, MAX_AUDIO_OUTPUT_CHANNELS, MAX_METER_CHANNELS, MAX_SYSEX_BYTES,
         MeterFrame, MeterSink, NoteExpressionPhysicalUiMapping, NoteExpressionValueFlags,
         NoteExpressionValueType, ParamAutomationPoint, ParamAutomationSegment,
@@ -42,55 +42,59 @@ macro_rules! export_vst3 {
         #[cfg(target_os = "windows")]
         #[unsafe(no_mangle)]
         pub extern "system" fn InitDll() -> bool {
-            true
+            $crate::vst3::abi_guard(false, || true)
         }
 
         #[cfg(target_os = "windows")]
         #[unsafe(no_mangle)]
         pub extern "system" fn ExitDll() -> bool {
-            true
+            $crate::vst3::abi_guard(false, || true)
         }
 
         #[cfg(target_os = "macos")]
         #[unsafe(no_mangle)]
         pub extern "system" fn bundleEntry(bundle_ref: *mut ::std::ffi::c_void) -> bool {
-            $crate::vst3::set_macos_bundle_ref(bundle_ref);
-            true
+            $crate::vst3::abi_guard(false, || {
+                $crate::vst3::set_macos_bundle_ref(bundle_ref);
+                true
+            })
         }
 
         #[cfg(target_os = "macos")]
         #[unsafe(no_mangle)]
         pub extern "system" fn bundleExit() -> bool {
-            true
+            $crate::vst3::abi_guard(false, || true)
         }
 
         #[cfg(target_os = "macos")]
         #[unsafe(no_mangle)]
         pub extern "system" fn BundleEntry(bundle_ref: *mut ::std::ffi::c_void) -> bool {
-            bundleEntry(bundle_ref)
+            $crate::vst3::abi_guard(false, || bundleEntry(bundle_ref))
         }
 
         #[cfg(target_os = "macos")]
         #[unsafe(no_mangle)]
         pub extern "system" fn BundleExit() -> bool {
-            bundleExit()
+            $crate::vst3::abi_guard(false, || bundleExit())
         }
 
         #[cfg(target_os = "linux")]
         #[unsafe(no_mangle)]
         pub extern "system" fn ModuleEntry(_library_handle: *mut ::std::ffi::c_void) -> bool {
-            true
+            $crate::vst3::abi_guard(false, || true)
         }
 
         #[cfg(target_os = "linux")]
         #[unsafe(no_mangle)]
         pub extern "system" fn ModuleExit() -> bool {
-            true
+            $crate::vst3::abi_guard(false, || true)
         }
 
         #[unsafe(no_mangle)]
         pub extern "system" fn GetPluginFactory() -> *mut $crate::vst3::raw::IPluginFactory {
-            $crate::vst3::create_plugin_factory::<$plugin>()
+            $crate::vst3::abi_guard(::std::ptr::null_mut(), || {
+                $crate::vst3::create_plugin_factory::<$plugin>()
+            })
         }
     };
 }

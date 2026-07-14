@@ -1430,12 +1430,16 @@ pub trait AudioKernel: Send + 'static {
 
     fn prepare(&mut self, _context: PrepareContext) {}
     fn reset(&mut self) {}
+    fn suspend(&mut self) {}
+    fn resume(&mut self) {}
     fn process(&mut self, context: &mut ProcessContext<'_>) -> ProcessResult;
     fn process_f64(&mut self, context: &mut ProcessContext64<'_>) -> ProcessResult {
         let _ = context;
         ProcessResult::Silence
     }
 }
+
+pub use AudioKernel as InstrumentKernel;
 
 pub trait Plugin: Send + Sync + 'static {
     const INFO: PluginInfo;
@@ -1568,6 +1572,23 @@ mod tests {
                 Ok(())
             } else {
                 Err(ParamError::Unknown(id.to_string()))
+            }
+        }
+
+        fn get_normalized_by_handle(&self, handle: ParamHandle) -> Option<f64> {
+            (handle.index() == 0).then(|| self.gain.normalized())
+        }
+
+        fn set_normalized_by_handle(
+            &self,
+            handle: ParamHandle,
+            normalized: f64,
+        ) -> Result<(), ParamError> {
+            if handle.index() == 0 {
+                self.gain.set_normalized(normalized);
+                Ok(())
+            } else {
+                Err(ParamError::Unknown(format!("handle:{}", handle.index())))
             }
         }
     }

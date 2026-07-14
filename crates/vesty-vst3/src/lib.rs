@@ -75,6 +75,10 @@ pub fn panic_guard<T>(fault: &FaultState, fallback: T, f: impl FnOnce() -> T) ->
     }
 }
 
+pub fn abi_guard<T>(fallback: T, f: impl FnOnce() -> T) -> T {
+    catch_unwind(AssertUnwindSafe(f)).unwrap_or(fallback)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Vst3BundleMetadata {
     pub info: PluginInfo,
@@ -186,9 +190,9 @@ mod tests {
         ProcessResult, StateError, UiDescriptor,
     };
     #[cfg(feature = "wry-ui")]
-    use vesty_ipc::BridgeErrorCode;
+    use vesty_ipc::{BridgeErrorCode, BridgeKind};
     use vesty_params::{
-        BoolParam, ChoiceParam, FloatParam, ParamCollection, ParamError, ParamSpec,
+        BoolParam, ChoiceParam, FloatParam, ParamCollection, ParamError, ParamHandle, ParamSpec,
     };
 
     struct RtCountingAllocator;
@@ -276,6 +280,27 @@ mod tests {
             } else {
                 Err(ParamError::Unknown(id.to_string()))
             }
+        }
+
+        fn get_normalized_by_handle(&self, handle: ParamHandle) -> Option<f64> {
+            match handle.index() {
+                0 => Some(self.gain.normalized()),
+                1 => Some(self.mode.normalized()),
+                _ => None,
+            }
+        }
+
+        fn set_normalized_by_handle(
+            &self,
+            handle: ParamHandle,
+            normalized: f64,
+        ) -> Result<(), ParamError> {
+            match handle.index() {
+                0 => self.gain.set_normalized(normalized),
+                1 => self.mode.set_normalized(normalized),
+                _ => return Err(ParamError::Unknown(format!("handle:{}", handle.index()))),
+            }
+            Ok(())
         }
     }
 
@@ -425,6 +450,29 @@ mod tests {
                 Err(ParamError::Unknown(id.to_string()))
             }
         }
+
+        fn get_normalized_by_handle(&self, handle: ParamHandle) -> Option<f64> {
+            match handle.index() {
+                0 => Some(self.bypass.normalized()),
+                1 => Some(self.meter.normalized()),
+                2 => Some(self.program.normalized()),
+                _ => None,
+            }
+        }
+
+        fn set_normalized_by_handle(
+            &self,
+            handle: ParamHandle,
+            normalized: f64,
+        ) -> Result<(), ParamError> {
+            match handle.index() {
+                0 => self.bypass.set_normalized(normalized),
+                1 => return Err(ParamError::ReadOnly("meter".to_string())),
+                2 => self.program.set_normalized(normalized),
+                _ => return Err(ParamError::Unknown(format!("handle:{}", handle.index()))),
+            }
+            Ok(())
+        }
     }
 
     #[derive(Default)]
@@ -528,6 +576,33 @@ mod tests {
             } else {
                 Err(ParamError::Unknown(id.to_string()))
             }
+        }
+
+        fn get_normalized_by_handle(&self, handle: ParamHandle) -> Option<f64> {
+            match handle.index() {
+                0 => Some(self.gain.normalized()),
+                1 => Some(self.cutoff.normalized()),
+                2 => Some(self.pitch.normalized()),
+                3 => Some(self.meter.normalized()),
+                4 => Some(self.program.normalized()),
+                _ => None,
+            }
+        }
+
+        fn set_normalized_by_handle(
+            &self,
+            handle: ParamHandle,
+            normalized: f64,
+        ) -> Result<(), ParamError> {
+            match handle.index() {
+                0 => self.gain.set_normalized(normalized),
+                1 => self.cutoff.set_normalized(normalized),
+                2 => self.pitch.set_normalized(normalized),
+                3 => return Err(ParamError::ReadOnly("meter".to_string())),
+                4 => self.program.set_normalized(normalized),
+                _ => return Err(ParamError::Unknown(format!("handle:{}", handle.index()))),
+            }
+            Ok(())
         }
     }
 
@@ -755,6 +830,27 @@ mod tests {
             } else {
                 Err(ParamError::Unknown(id.to_string()))
             }
+        }
+
+        fn get_normalized_by_handle(&self, handle: ParamHandle) -> Option<f64> {
+            match handle.index() {
+                0 => Some(self.first.normalized()),
+                1 => Some(self.second.normalized()),
+                _ => None,
+            }
+        }
+
+        fn set_normalized_by_handle(
+            &self,
+            handle: ParamHandle,
+            normalized: f64,
+        ) -> Result<(), ParamError> {
+            match handle.index() {
+                0 => self.first.set_normalized(normalized),
+                1 => self.second.set_normalized(normalized),
+                _ => return Err(ParamError::Unknown(format!("handle:{}", handle.index()))),
+            }
+            Ok(())
         }
     }
 
@@ -1240,14 +1336,30 @@ mod tests {
             Restart(int32),
         }
 
-        #[derive(Default)]
         struct FakeComponentHandler {
             calls: RefCell<Vec<HandlerCall>>,
+            perform_result: Cell<tresult>,
+        }
+
+        impl Default for FakeComponentHandler {
+            fn default() -> Self {
+                Self {
+                    calls: RefCell::new(Vec::new()),
+                    perform_result: Cell::new(kResultOk),
+                }
+            }
         }
 
         impl FakeComponentHandler {
             fn calls(&self) -> Vec<HandlerCall> {
                 self.calls.borrow().clone()
+            }
+
+            fn rejecting_perform() -> Self {
+                Self {
+                    perform_result: Cell::new(kResultFalse),
+                    ..Self::default()
+                }
             }
         }
 
@@ -1265,7 +1377,7 @@ mod tests {
                 self.calls
                     .borrow_mut()
                     .push(HandlerCall::Perform(id, value_normalized));
-                kResultOk
+                self.perform_result.get()
             }
 
             unsafe fn endEdit(&self, id: ParamID) -> tresult {
@@ -1295,12 +1407,32 @@ mod tests {
 
         impl AudioKernel for CaptureKernel {
             fn process(&mut self, context: &mut vesty_core::ProcessContext<'_>) -> ProcessResult {
+                let initial_gain = context.params().get_normalized("gain").unwrap_or(0.5);
                 let mut captured = CAPTURED_PROCESS.lock().unwrap();
                 captured.events = context.events().to_vec();
                 captured.transport = context.transport();
                 captured.process_mode = context.process_mode();
-                captured.param_value = context.params().get_normalized("gain");
+                captured.param_value = Some(initial_gain);
                 captured.no_alloc_active = NoAllocGuard::is_active();
+                drop(captured);
+
+                let frames = context.audio().frames().min(u32::MAX as usize) as u32;
+                let handle = vesty_params::ParamHandle::from_index(0);
+                let output_channels = context.audio().output_channels();
+                let (audio, events) = context.audio_mut_and_events();
+                for segment in
+                    vesty_core::ParamAutomationSegments::new(events, handle, initial_gain, frames)
+                {
+                    for frame in segment.start_sample..segment.end_sample {
+                        for channel in 0..output_channels {
+                            audio.set_output_sample(
+                                channel,
+                                frame as usize,
+                                segment.normalized as f32,
+                            );
+                        }
+                    }
+                }
                 ProcessResult::Continue
             }
         }
@@ -1364,6 +1496,23 @@ mod tests {
                     Ok(())
                 } else {
                     Err(ParamError::Unknown(id.to_string()))
+                }
+            }
+
+            fn get_normalized_by_handle(&self, handle: ParamHandle) -> Option<f64> {
+                (handle.index() == 0).then(|| self.program.normalized())
+            }
+
+            fn set_normalized_by_handle(
+                &self,
+                handle: ParamHandle,
+                normalized: f64,
+            ) -> Result<(), ParamError> {
+                if handle.index() == 0 {
+                    self.program.set_normalized(normalized);
+                    Ok(())
+                } else {
+                    Err(ParamError::Unknown(format!("handle:{}", handle.index())))
                 }
             }
         }
@@ -1471,6 +1620,9 @@ mod tests {
         static PREPARE_MATRIX_RECORDS: LazyLock<Mutex<Vec<PrepareMatrixRecord>>> =
             LazyLock::new(|| Mutex::new(Vec::new()));
         static PREPARE_MATRIX_KERNEL_CREATIONS: TestAtomicUsize = TestAtomicUsize::new(0);
+        static PREPARE_MATRIX_RESETS: TestAtomicUsize = TestAtomicUsize::new(0);
+        static PREPARE_MATRIX_SUSPENDS: TestAtomicUsize = TestAtomicUsize::new(0);
+        static PREPARE_MATRIX_RESUMES: TestAtomicUsize = TestAtomicUsize::new(0);
         static PREPARE_MATRIX_TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
         struct PrepareMatrixKernel {
@@ -1481,6 +1633,18 @@ mod tests {
         impl AudioKernel for PrepareMatrixKernel {
             fn prepare(&mut self, context: PrepareContext) {
                 self.prepare = context;
+            }
+
+            fn reset(&mut self) {
+                PREPARE_MATRIX_RESETS.fetch_add(1, TestOrdering::Relaxed);
+            }
+
+            fn suspend(&mut self) {
+                PREPARE_MATRIX_SUSPENDS.fetch_add(1, TestOrdering::Relaxed);
+            }
+
+            fn resume(&mut self) {
+                PREPARE_MATRIX_RESUMES.fetch_add(1, TestOrdering::Relaxed);
             }
 
             fn process(&mut self, context: &mut vesty_core::ProcessContext<'_>) -> ProcessResult {
@@ -1548,7 +1712,7 @@ mod tests {
                 let _frames = context.audio().frames();
                 NO_ALLOC_INPUT_CHANNELS
                     .store(context.audio().input_channels(), TestOrdering::Relaxed);
-                let _gain = context.params().get_normalized("gain");
+                let _gain = context.param_normalized(ParamHandle::from_index(0));
                 ProcessResult::Continue
             }
         }
@@ -1843,6 +2007,77 @@ mod tests {
 
             fn create_kernel(&self, _init: KernelInit) -> Self::Kernel {
                 PanicKernel
+            }
+        }
+
+        struct DefaultPanicPlugin;
+
+        impl Default for DefaultPanicPlugin {
+            fn default() -> Self {
+                panic!("default panic")
+            }
+        }
+
+        impl Plugin for DefaultPanicPlugin {
+            const INFO: PluginInfo = PluginInfo {
+                name: "Default Panic",
+                vendor: "Vesty",
+                url: "",
+                email: "",
+                version: "0.1.0",
+                class_id: *b"default-panic-01",
+                kind: PluginKind::AudioEffect,
+            };
+
+            type Params = TestParams;
+            type Kernel = SilenceKernel;
+
+            fn params(&self) -> &Self::Params {
+                unreachable!("default panic plugin is never constructed")
+            }
+
+            fn create_kernel(&self, _init: KernelInit) -> Self::Kernel {
+                SilenceKernel
+            }
+        }
+
+        #[derive(Default)]
+        struct CallbackPanicPlugin {
+            params: TestParams,
+        }
+
+        impl Plugin for CallbackPanicPlugin {
+            const INFO: PluginInfo = PluginInfo {
+                name: "Callback Panic",
+                vendor: "Vesty",
+                url: "",
+                email: "",
+                version: "0.1.0",
+                class_id: *b"callback-panic-1",
+                kind: PluginKind::AudioEffect,
+            };
+
+            type Params = TestParams;
+            type Kernel = SilenceKernel;
+
+            fn params(&self) -> &Self::Params {
+                &self.params
+            }
+
+            fn create_kernel(&self, _init: KernelInit) -> Self::Kernel {
+                SilenceKernel
+            }
+
+            fn ui(&self) -> Option<UiDescriptor> {
+                panic!("ui panic")
+            }
+
+            fn latency_samples(&self) -> u32 {
+                panic!("latency panic")
+            }
+
+            fn save_custom_state(&self) -> Result<Option<serde_json::Value>, StateError> {
+                panic!("state panic")
             }
         }
 
@@ -5039,8 +5274,10 @@ mod tests {
                     ]
                 );
                 let param_value = captured.param_value.expect("captured gain value");
-                assert!((param_value - 0.8).abs() < 0.000_001);
+                assert!((param_value - 0.5).abs() < 0.000_001);
                 assert!(captured.no_alloc_active);
+                assert_eq!(output_l, [0.5, 0.5, 0.2, 0.2, 0.2, 0.2, 0.8, 0.8]);
+                assert_eq!(output_r, output_l);
                 assert_eq!(
                     captured.transport,
                     Transport {
@@ -5158,7 +5395,7 @@ mod tests {
                     ]
                 );
                 let param_value = captured.param_value.expect("captured program value");
-                assert!((param_value - 1.0).abs() < 0.000_001);
+                assert!((param_value - 0.0).abs() < 0.000_001);
                 assert!(captured.no_alloc_active);
                 assert_eq!(
                     PROGRAM_AUTOMATION_APPLY_CALLS.load(TestOrdering::Relaxed),
@@ -5166,6 +5403,46 @@ mod tests {
                 );
                 assert_eq!(PROGRAM_AUTOMATION_LOAD_CALLS.load(TestOrdering::Relaxed), 0);
             }
+        }
+
+        #[test]
+        fn processor_drives_reset_suspend_and_resume_lifecycle() {
+            let _lock = PREPARE_MATRIX_TEST_LOCK.lock().unwrap();
+            PREPARE_MATRIX_KERNEL_CREATIONS.store(0, TestOrdering::Relaxed);
+            PREPARE_MATRIX_RESETS.store(0, TestOrdering::Relaxed);
+            PREPARE_MATRIX_SUSPENDS.store(0, TestOrdering::Relaxed);
+            PREPARE_MATRIX_RESUMES.store(0, TestOrdering::Relaxed);
+
+            let wrapper = ComWrapper::new(crate::bindings_impl::VestyProcessor::<
+                PrepareMatrixPlugin,
+            >::with_telemetry_registry(
+                std::sync::Arc::new(crate::bindings_impl::Vst3TelemetryRegistry::default()),
+            ));
+            let processor = wrapper.to_com_ptr::<IAudioProcessor>().unwrap();
+            let component = wrapper.to_com_ptr::<IComponent>().unwrap();
+            let mut setup = ProcessSetup {
+                processMode: ProcessModes_::kRealtime as int32,
+                symbolicSampleSize: SymbolicSampleSizes_::kSample32 as int32,
+                maxSamplesPerBlock: 64,
+                sampleRate: 48_000.0,
+            };
+
+            // SAFETY: Test code invokes lifecycle callbacks on a locally owned COM wrapper.
+            unsafe {
+                assert_eq!(processor.setupProcessing(&mut setup), kResultOk);
+                assert_eq!(processor.setProcessing(0), kResultOk);
+                assert_eq!(processor.setProcessing(1), kResultOk);
+                assert_eq!(component.setActive(0), kResultOk);
+                assert_eq!(component.setActive(1), kResultOk);
+            }
+
+            assert_eq!(
+                PREPARE_MATRIX_KERNEL_CREATIONS.load(TestOrdering::Relaxed),
+                2
+            );
+            assert_eq!(PREPARE_MATRIX_RESETS.load(TestOrdering::Relaxed), 3);
+            assert_eq!(PREPARE_MATRIX_SUSPENDS.load(TestOrdering::Relaxed), 1);
+            assert_eq!(PREPARE_MATRIX_RESUMES.load(TestOrdering::Relaxed), 1);
         }
 
         #[test]
@@ -7055,6 +7332,80 @@ mod tests {
         }
 
         #[test]
+        fn factory_catches_plugin_default_panics() {
+            // SAFETY: Test code invokes the generated COM callback to verify panic containment.
+            unsafe {
+                let factory = ComPtr::<IPluginFactory>::from_raw(create_plugin_factory::<
+                    DefaultPanicPlugin,
+                >())
+                .expect("factory");
+                let metadata = Vst3BundleMetadata::for_plugin::<DefaultPanicPlugin>();
+                let processor_cid = tuid(metadata.processor_class_id);
+                let mut processor: *mut c_void = ptr::null_mut();
+
+                assert_eq!(
+                    factory.createInstance(
+                        processor_cid.as_ptr(),
+                        IAudioProcessor_iid.as_ptr(),
+                        &mut processor,
+                    ),
+                    kResultFalse
+                );
+                assert!(processor.is_null());
+            }
+        }
+
+        #[test]
+        fn processor_and_controller_callbacks_catch_plugin_hook_panics() {
+            // SAFETY: Test code invokes generated COM callbacks with a plugin whose hooks panic.
+            unsafe {
+                let factory = ComPtr::<IPluginFactory>::from_raw(create_plugin_factory::<
+                    CallbackPanicPlugin,
+                >())
+                .expect("factory");
+                let metadata = Vst3BundleMetadata::for_plugin::<CallbackPanicPlugin>();
+
+                let processor_cid = tuid(metadata.processor_class_id);
+                let mut processor: *mut c_void = ptr::null_mut();
+                assert_eq!(
+                    factory.createInstance(
+                        processor_cid.as_ptr(),
+                        IAudioProcessor_iid.as_ptr(),
+                        &mut processor,
+                    ),
+                    kResultOk
+                );
+                let processor =
+                    ComPtr::<IAudioProcessor>::from_raw(processor as *mut IAudioProcessor)
+                        .expect("processor");
+                assert_eq!(processor.getLatencySamples(), 0);
+
+                let controller_cid = tuid(metadata.controller_class_id);
+                let mut controller: *mut c_void = ptr::null_mut();
+                assert_eq!(
+                    factory.createInstance(
+                        controller_cid.as_ptr(),
+                        IEditController_iid.as_ptr(),
+                        &mut controller,
+                    ),
+                    kResultOk
+                );
+                let controller =
+                    ComPtr::<IEditController>::from_raw(controller as *mut IEditController)
+                        .expect("controller");
+                assert!(
+                    controller
+                        .createView(c"editor".as_ptr() as *const c_char)
+                        .is_null()
+                );
+
+                let state = ComWrapper::new(MemoryStream::default());
+                let state_ptr = state.to_com_ptr::<IBStream>().unwrap();
+                assert_eq!(controller.getState(state_ptr.as_ptr()), kResultFalse);
+            }
+        }
+
+        #[test]
         fn processor_panic_emits_rt_log_event_to_controller() {
             let _guard = PANIC_PLUGIN_TEST_LOCK.lock().unwrap();
             // SAFETY: Test code is exercising fake VST3/COM objects and raw callback entrypoints with fixtures constructed in this module.
@@ -7432,6 +7783,74 @@ mod tests {
 
         #[cfg(feature = "wry-ui")]
         #[test]
+        fn controller_wry_bridge_reports_host_rejection_without_mutating_param() {
+            // SAFETY: Test code wires a fake component handler into the controller COM callback.
+            unsafe {
+                let controller = crate::bindings_impl::VestyController::<TestPlugin>::new();
+                let gain_id = controller.param_id_for_test(0).expect("gain ParamID");
+                let handler = ComWrapper::new(FakeComponentHandler::rejecting_perform());
+                let handler_ptr = handler.to_com_ptr::<IComponentHandler>().unwrap();
+                assert_eq!(
+                    controller.setComponentHandler(handler_ptr.as_ptr()),
+                    kResultOk
+                );
+                let endpoint = controller.bridge_endpoint();
+                let bridge = endpoint.bridge_handler();
+
+                let hello = serde_json::json!({
+                    "v": 1,
+                    "session": "pending",
+                    "seq": 1,
+                    "lane": "command",
+                    "kind": "request",
+                    "type": "bridge.hello",
+                    "id": "hello",
+                    "payload": {
+                        "supportedProtocolVersions": [1],
+                        "jsPackageVersion": "test",
+                        "pageUrl": "vesty://assets/index.html",
+                    },
+                })
+                .to_string();
+                let hello_packets = bridge(hello);
+                assert_eq!(
+                    hello_packets[0].payload.as_ref().unwrap()["paramValues"][0]["normalized"],
+                    0.5
+                );
+                let session = hello_packets[0]
+                    .payload
+                    .as_ref()
+                    .and_then(|payload| payload.get("editorSessionId"))
+                    .and_then(serde_json::Value::as_str)
+                    .expect("editor session");
+
+                let perform = serde_json::json!({
+                    "v": 1,
+                    "session": session,
+                    "seq": 2,
+                    "lane": "param",
+                    "kind": "request",
+                    "type": "param.perform",
+                    "id": "perform-rejected",
+                    "payload": { "id": "gain", "normalized": 0.75 },
+                })
+                .to_string();
+                let packets = bridge(perform);
+
+                assert_eq!(packets.len(), 1);
+                assert_eq!(packets[0].kind, BridgeKind::Error);
+                assert_eq!(packets[0].reply_to.as_deref(), Some("perform-rejected"));
+                assert_eq!(
+                    packets[0].error.as_ref().map(|error| error.code.clone()),
+                    Some(BridgeErrorCode::HostRejected)
+                );
+                assert_eq!(controller.getParamNormalized(gain_id), 0.5);
+                assert_eq!(handler.calls(), vec![HandlerCall::Perform(gain_id, 0.75)]);
+            }
+        }
+
+        #[cfg(feature = "wry-ui")]
+        #[test]
         fn controller_wry_bridge_emits_param_changed_after_ui_perform() {
             // SAFETY: Test code is exercising fake VST3/COM objects and raw callback entrypoints with fixtures constructed in this module.
             unsafe {
@@ -7463,6 +7882,10 @@ mod tests {
                 })
                 .to_string();
                 let hello_packets = bridge(hello);
+                assert_eq!(
+                    hello_packets[0].payload.as_ref().unwrap()["paramValues"][0]["normalized"],
+                    0.5
+                );
                 let session = hello_packets[0]
                     .payload
                     .as_ref()
@@ -7570,6 +7993,10 @@ mod tests {
                 })
                 .to_string();
                 let hello_packets = bridge(hello);
+                assert_eq!(
+                    hello_packets[0].payload.as_ref().unwrap()["paramValues"][0]["normalized"],
+                    0.25
+                );
                 let session = hello_packets[0]
                     .payload
                     .as_ref()
@@ -7662,6 +8089,24 @@ mod tests {
                     .expect("state param changed event");
                 assert_eq!(state_event.payload.as_ref().unwrap()["normalized"], 0.75);
                 assert_eq!(state_event.payload.as_ref().unwrap()["source"], "state");
+
+                let reopened = controller.bridge_endpoint().bridge_handler();
+                let reopened_hello = serde_json::json!({
+                    "v": 1,
+                    "session": "pending",
+                    "seq": 1,
+                    "lane": "command",
+                    "kind": "request",
+                    "type": "bridge.hello",
+                    "id": "reopened-hello",
+                    "payload": { "supportedProtocolVersions": [1] },
+                })
+                .to_string();
+                let reopened_packets = reopened(reopened_hello);
+                assert_eq!(
+                    reopened_packets[0].payload.as_ref().unwrap()["paramValues"][0]["normalized"],
+                    0.75
+                );
             }
         }
 

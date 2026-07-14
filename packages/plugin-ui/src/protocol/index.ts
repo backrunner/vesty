@@ -13,6 +13,7 @@ export type { ParamFlags } from "./ParamFlags";
 export type { ParamKind } from "./ParamKind";
 export type { ParamMidiMapping } from "./ParamMidiMapping";
 export type { ParamSpec } from "./ParamSpec";
+export type { ParamValueSnapshot } from "./ParamValueSnapshot";
 export type { PluginFaultReport } from "./PluginFaultReport";
 export type { PluginSnapshot } from "./PluginSnapshot";
 export type { RtLogKind } from "./RtLogKind";

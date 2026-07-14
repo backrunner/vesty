@@ -5,11 +5,12 @@ use vesty_core::MeterFrame;
 use vesty_ipc::{
     BridgeDiagnosticsSnapshot, BridgeErrorCode, BridgeErrorPayload, BridgeHelloPayload, BridgeKind,
     BridgeLane, BridgePacket, BridgeReadyPayload, IpcError, ParamChangeSource, ParamChangedEvent,
-    PluginFaultReport, PluginSnapshot, RtLogKind as IpcRtLogKind, RtLogLevel as IpcRtLogLevel,
-    RtLogQueue as IpcRtLogQueue, RtLogRecord, advance_bridge_packet_seq,
-    max_message_bytes_for_lane, parse_packet, sanitize_bridge_json_value,
-    validate_bridge_json_value, validate_bridge_packet_flags, validate_bridge_packet_id,
-    validate_bridge_packet_seq, validate_bridge_session, validate_packet_type,
+    ParamValueSnapshot, PluginFaultReport, PluginSnapshot, RtLogKind as IpcRtLogKind,
+    RtLogLevel as IpcRtLogLevel, RtLogQueue as IpcRtLogQueue, RtLogRecord,
+    advance_bridge_packet_seq, max_message_bytes_for_lane, parse_packet,
+    sanitize_bridge_json_value, validate_bridge_json_value, validate_bridge_packet_flags,
+    validate_bridge_packet_id, validate_bridge_packet_seq, validate_bridge_session,
+    validate_packet_type,
 };
 use vesty_params::{
     ParamSpec, ParamSpecError, format_normalized_value, normalized_to_plain,
@@ -166,6 +167,7 @@ pub struct ParamGesture {
     pub id: String,
     pub normalized: Option<f64>,
     pub gesture_id: Option<String>,
+    pub request_ids: Vec<String>,
 }
 
 pub struct BridgeRuntime<T: BridgeTransport> {
@@ -313,21 +315,25 @@ impl<T: BridgeTransport> BridgeRuntime<T> {
             );
         }
 
-        if packet.session != self.session {
-            return self.send_error(
-                &packet,
-                BridgeErrorCode::PermissionDenied,
-                "session mismatch",
-                false,
-            );
-        }
-
         if let Err(message) = validate_packet_type(&packet.packet_type) {
             return self.send_error(&packet, BridgeErrorCode::ValidationError, message, false);
         }
 
         if let Err(message) = validate_inbound_request_shape(&packet) {
             return self.send_error(&packet, BridgeErrorCode::ValidationError, message, false);
+        }
+
+        if packet.session != self.session {
+            if packet.packet_type == "bridge.hello" && packet.session == "pending" {
+                self.reset_for_reload();
+            } else {
+                return self.send_error(
+                    &packet,
+                    BridgeErrorCode::PermissionDenied,
+                    "session mismatch",
+                    false,
+                );
+            }
         }
 
         if let Some(message) = self.disabled_request_capability_message(&packet) {
@@ -589,6 +595,20 @@ impl<T: BridgeTransport> BridgeRuntime<T> {
         std::mem::take(&mut self.pending_param_gestures)
     }
 
+    pub fn set_ready_param_values(&mut self, param_values: Vec<ParamValueSnapshot>) {
+        self.ready.param_values = param_values;
+    }
+
+    fn reset_for_reload(&mut self) {
+        self.session = "pending".to_string();
+        self.hello_acknowledged = false;
+        self.ready_acknowledged = false;
+        self.subscriptions = SubscriptionTable::default();
+        self.coalesced_params.clear();
+        self.latest_meters.clear();
+        self.pending_param_gestures.clear();
+    }
+
     pub fn pending_param_gesture_count(&self) -> usize {
         self.pending_param_gestures.len()
     }
@@ -697,6 +717,7 @@ impl<T: BridgeTransport> BridgeRuntime<T> {
             id: id.clone(),
             normalized: None,
             gesture_id,
+            request_ids: packet.id.iter().cloned().collect(),
         });
         self.coalesced_params.remove(&id);
         let response =
@@ -759,7 +780,12 @@ impl<T: BridgeTransport> BridgeRuntime<T> {
                 return self.send_error(packet, BridgeErrorCode::ValidationError, message, false);
             }
         };
-        if self.try_coalesce_param_perform(&id, normalized, gesture_id.clone()) {
+        if self.try_coalesce_param_perform(
+            &id,
+            normalized,
+            gesture_id.clone(),
+            packet.id.as_deref(),
+        ) {
             let response = packet.response_to(
                 self.next_seq(),
                 Some(json!({ "id": id, "normalized": normalized, "queued": true, "coalesced": true })),
@@ -783,6 +809,7 @@ impl<T: BridgeTransport> BridgeRuntime<T> {
             id: id.clone(),
             normalized: Some(normalized),
             gesture_id,
+            request_ids: packet.id.iter().cloned().collect(),
         });
         self.coalesced_params.insert(id.clone(), index);
         let response = packet.response_to(
@@ -798,6 +825,7 @@ impl<T: BridgeTransport> BridgeRuntime<T> {
         id: &str,
         normalized: f64,
         gesture_id: Option<String>,
+        request_id: Option<&str>,
     ) -> bool {
         let Some(index) = self.coalesced_params.get(id).copied() else {
             return false;
@@ -812,6 +840,9 @@ impl<T: BridgeTransport> BridgeRuntime<T> {
         }
         gesture.normalized = Some(normalized);
         gesture.gesture_id = gesture_id;
+        if let Some(request_id) = request_id {
+            gesture.request_ids.push(request_id.to_string());
+        }
         true
     }
 
@@ -1448,12 +1479,19 @@ mod tests {
     use vesty_ipc::{
         BridgeCapabilities, MAX_BRIDGE_PACKET_FLAG_BYTES, MAX_BRIDGE_PACKET_FLAGS,
         MAX_BRIDGE_PACKET_ID_BYTES, MAX_BRIDGE_PACKET_SEQ, MAX_BRIDGE_PACKET_TYPE_BYTES,
-        MAX_BRIDGE_SESSION_BYTES, MAX_COMMAND_MESSAGE_BYTES, PluginSnapshot,
+        MAX_BRIDGE_SESSION_BYTES, MAX_COMMAND_MESSAGE_BYTES, ParamValueSnapshot, PluginSnapshot,
         validate_bridge_error_message,
     };
     use vesty_params::{ParamSpec, ParamSpecError};
 
     fn ready_payload(params: Vec<ParamSpec>) -> BridgeReadyPayload {
+        let param_values = params
+            .iter()
+            .map(|param| ParamValueSnapshot {
+                id: param.id.clone(),
+                normalized: param.default_normalized,
+            })
+            .collect();
         BridgeReadyPayload {
             protocol_version: 1,
             instance_id: "instance".to_string(),
@@ -1463,6 +1501,7 @@ mod tests {
             vendor: "Vesty".to_string(),
             capabilities: BridgeCapabilities::v1_default(),
             params,
+            param_values,
             snapshot: PluginSnapshot::default(),
         }
     }
@@ -2418,6 +2457,7 @@ mod tests {
             vendor: "Vesty".to_string(),
             capabilities: BridgeCapabilities::v1_default(),
             params: Vec::new(),
+            param_values: Vec::new(),
             snapshot: PluginSnapshot::default(),
         };
         let mut runtime = BridgeRuntime::new("pending", ready, MemoryTransport::default()).unwrap();
@@ -2447,6 +2487,44 @@ mod tests {
         assert_eq!(runtime.transport.sent[2].reply_to.as_deref(), Some("fresh"));
         assert_eq!(runtime.transport.sent[3].reply_to.as_deref(), Some("ready"));
         assert!(runtime.ready_acknowledged());
+    }
+
+    #[test]
+    fn reload_hello_resets_session_state_and_refreshes_param_values() {
+        let mut ready = ready_payload(vec![ParamSpec::float("gain", "Gain", 0.0, 1.0, 0.5)]);
+        ready.editor_session_id = "editor-reload".to_string();
+        let mut runtime = BridgeRuntime::new("pending", ready, MemoryTransport::default()).unwrap();
+
+        runtime
+            .receive_json(r#"{"v":1,"session":"pending","seq":1,"lane":"command","kind":"request","type":"bridge.hello","id":"hello-1","payload":{"supportedProtocolVersions":[1]}}"#)
+            .unwrap();
+        runtime
+            .receive_json(r#"{"v":1,"session":"editor-reload","seq":2,"lane":"command","kind":"request","type":"subscription.add","id":"sub","payload":{"topic":"param.changed"}}"#)
+            .unwrap();
+        runtime
+            .receive_json(r#"{"v":1,"session":"editor-reload","seq":3,"lane":"param","kind":"request","type":"param.begin","id":"begin","payload":{"id":"gain"}}"#)
+            .unwrap();
+        assert_eq!(runtime.diagnostics_snapshot().subscription_count, 1);
+        assert_eq!(runtime.pending_param_gesture_count(), 1);
+
+        runtime.set_ready_param_values(vec![ParamValueSnapshot {
+            id: "gain".to_string(),
+            normalized: 0.75,
+        }]);
+        runtime
+            .receive_json(r#"{"v":1,"session":"pending","seq":4,"lane":"command","kind":"request","type":"bridge.hello","id":"hello-2","payload":{"supportedProtocolVersions":[1]}}"#)
+            .unwrap();
+
+        let response = runtime.transport.sent.last().unwrap();
+        assert_eq!(response.kind, BridgeKind::Response);
+        assert_eq!(response.reply_to.as_deref(), Some("hello-2"));
+        assert_eq!(
+            response.payload.as_ref().unwrap()["paramValues"][0]["normalized"],
+            0.75
+        );
+        assert_eq!(runtime.diagnostics_snapshot().subscription_count, 0);
+        assert_eq!(runtime.pending_param_gesture_count(), 0);
+        assert!(!runtime.ready_acknowledged());
     }
 
     #[test]
@@ -2530,18 +2608,21 @@ mod tests {
                     id: "gain".to_string(),
                     normalized: None,
                     gesture_id: Some("drag-1".to_string()),
+                    request_ids: vec!["1".to_string()],
                 },
                 ParamGesture {
                     phase: ParamGesturePhase::Perform,
                     id: "gain".to_string(),
                     normalized: Some(1.0),
                     gesture_id: Some("drag-1".to_string()),
+                    request_ids: vec!["2".to_string()],
                 },
                 ParamGesture {
                     phase: ParamGesturePhase::End,
                     id: "gain".to_string(),
                     normalized: None,
                     gesture_id: Some("drag-1".to_string()),
+                    request_ids: vec!["3".to_string()],
                 },
             ]
         );
@@ -2577,18 +2658,21 @@ mod tests {
                     id: "gain".to_string(),
                     normalized: None,
                     gesture_id: Some("drag-1".to_string()),
+                    request_ids: vec!["begin".to_string()],
                 },
                 ParamGesture {
                     phase: ParamGesturePhase::Perform,
                     id: "gain".to_string(),
                     normalized: Some(0.8),
                     gesture_id: Some("drag-1".to_string()),
+                    request_ids: vec!["perform-1".to_string(), "perform-2".to_string()],
                 },
                 ParamGesture {
                     phase: ParamGesturePhase::End,
                     id: "gain".to_string(),
                     normalized: None,
                     gesture_id: Some("drag-1".to_string()),
+                    request_ids: vec!["end".to_string()],
                 },
             ]
         );
@@ -2619,24 +2703,28 @@ mod tests {
                     id: "gain".to_string(),
                     normalized: None,
                     gesture_id: Some("drag-1".to_string()),
+                    request_ids: vec!["begin".to_string()],
                 },
                 ParamGesture {
                     phase: ParamGesturePhase::Perform,
                     id: "gain".to_string(),
                     normalized: Some(0.2),
                     gesture_id: Some("drag-1".to_string()),
+                    request_ids: vec!["perform-1".to_string()],
                 },
                 ParamGesture {
                     phase: ParamGesturePhase::End,
                     id: "gain".to_string(),
                     normalized: None,
                     gesture_id: Some("drag-1".to_string()),
+                    request_ids: vec!["end".to_string()],
                 },
                 ParamGesture {
                     phase: ParamGesturePhase::Perform,
                     id: "gain".to_string(),
                     normalized: Some(0.7),
                     gesture_id: Some("late".to_string()),
+                    request_ids: vec!["perform-2".to_string()],
                 },
             ]
         );

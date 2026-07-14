@@ -297,7 +297,16 @@ pub struct BridgeReadyPayload {
     pub vendor: String,
     pub capabilities: BridgeCapabilities,
     pub params: Vec<ParamSpec>,
+    pub param_values: Vec<ParamValueSnapshot>,
     pub snapshot: PluginSnapshot,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, TS, PartialEq)]
+#[ts(export_to = "protocol/ParamValueSnapshot.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct ParamValueSnapshot {
+    pub id: String,
+    pub normalized: f64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, TS, PartialEq, Eq)]
@@ -626,6 +635,7 @@ pub fn export_protocol_bindings(
     export_ts::<ParamFlags>(&ts_config)?;
     export_ts::<ParamMidiMapping>(&ts_config)?;
     export_ts::<ParamSpec>(&ts_config)?;
+    export_ts::<ParamValueSnapshot>(&ts_config)?;
 
     write_json_schema::<BridgePacket>(&json_schema_dir, "BridgePacket.schema.json")?;
     write_json_schema::<BridgeReadyPayload>(&json_schema_dir, "BridgeReadyPayload.schema.json")?;
@@ -734,6 +744,9 @@ mod tests {
                     ]
                 }
             ],
+            "paramValues": [
+                { "id": "gain", "normalized": 0.25, "source": "host" }
+            ],
             "snapshot": {
                 "revision": 1,
                 "paramsRevision": 2,
@@ -751,6 +764,13 @@ mod tests {
         assert!(payload.capabilities.diagnostics);
         assert_eq!(payload.params[0].id.as_str(), "gain");
         assert_eq!(payload.params[0].midi_mappings[0].controller, 7);
+        assert_eq!(
+            payload.param_values,
+            vec![ParamValueSnapshot {
+                id: "gain".to_owned(),
+                normalized: 0.25,
+            }]
+        );
         assert_eq!(payload.snapshot.revision, 1);
     }
 
@@ -1081,6 +1101,17 @@ mod tests {
         )
         .unwrap();
         assert!(ready.contains("params: Array<ParamSpec>"));
+        assert!(ready.contains("paramValues: Array<ParamValueSnapshot>"));
+
+        let param_value = fs::read_to_string(
+            report
+                .typescript_dir
+                .join("protocol")
+                .join("ParamValueSnapshot.ts"),
+        )
+        .unwrap();
+        assert!(param_value.contains("id: string"));
+        assert!(param_value.contains("normalized: number"));
 
         let ready_schema: serde_json::Value = serde_json::from_str(
             &fs::read_to_string(

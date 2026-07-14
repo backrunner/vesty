@@ -659,6 +659,27 @@ pub fn bootstrap_script() -> &'static str {
     if (!Array.isArray(value)) throw readyPayloadError("params must be an array");
     const ids = new Set();
     value.forEach((param, index) => assertParamSpec(param, index, ids));
+    return ids;
+  }
+
+  function assertReadyParamValues(value, paramIds) {
+    if (!Array.isArray(value)) throw readyPayloadError("paramValues must be an array");
+    if (value.length !== paramIds.size) {
+      throw readyPayloadError("paramValues must contain one value for every parameter");
+    }
+    const seen = new Set();
+    value.forEach((entry, index) => {
+      const name = `paramValues[${index}]`;
+      const record = assertRecord(entry, name);
+      const id = assertNonEmptyString(record.id, `${name}.id`);
+      if (!paramIds.has(id)) throw readyPayloadError(`${name}.id references an unknown parameter`);
+      if (seen.has(id)) throw readyPayloadError(`duplicate current parameter value '${id}'`);
+      seen.add(id);
+      const normalized = assertFiniteNumber(record.normalized, `${name}.normalized`);
+      if (normalized < 0 || normalized > 1) {
+        throw readyPayloadError(`${name}.normalized must be within 0.0..=1.0`);
+      }
+    });
   }
 
   function assertCompatibleReadyPayload(payload) {
@@ -675,7 +696,8 @@ pub fn bootstrap_script() -> &'static str {
     assertNonEmptyString(ready.pluginName, "pluginName");
     assertNonEmptyString(ready.vendor, "vendor");
     assertCapabilities(ready.capabilities);
-    assertReadyParams(ready.params);
+    const paramIds = assertReadyParams(ready.params);
+    assertReadyParamValues(ready.paramValues, paramIds);
     assertPluginSnapshot(ready.snapshot);
   }
 
@@ -1989,9 +2011,14 @@ mod tests {
         assert!(script.contains("assertCapabilities"));
         assert!(script.contains("assertPluginSnapshot"));
         assert!(script.contains("assertReadyParams"));
+        assert!(script.contains("assertReadyParamValues"));
         assert!(script.contains("assertParamSpec"));
         assert!(script.contains("assertParamMidiMappings"));
         assert!(script.contains("duplicate parameter id"));
+        assert!(script.contains("duplicate current parameter value"));
+        assert!(script.contains("paramValues must contain one value for every parameter"));
+        assert!(script.contains("references an unknown parameter"));
+        assert!(script.contains("${name}.normalized"));
         assert!(script.contains("midiMappings must be an array"));
         assert!(script.contains("capabilities.${key} must be boolean"));
         assert!(script.contains("snapshot.revision"));

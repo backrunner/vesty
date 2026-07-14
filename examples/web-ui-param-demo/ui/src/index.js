@@ -5,12 +5,24 @@ const bridgeStatus = document.querySelector("#bridge-status");
 const peak = document.querySelector("#peak");
 const meterValue = document.querySelector("#meter-value");
 let editing = false;
+let unsubscribeParamChanged;
+
+function setNormalized(normalized) {
+  const next = Math.min(1, Math.max(0, Number(normalized) || 0));
+  if (mix) mix.value = String(next);
+  if (value) value.value = next.toFixed(3);
+}
 
 bridge?.ready()
   .then((payload) => {
     if (bridgeStatus) {
       bridgeStatus.value = `ready:${payload.pluginName ?? "unknown"}`;
     }
+    const current = payload.paramValues?.find((param) => param.id === "mix")?.normalized;
+    setNormalized(current ?? 0.5);
+    unsubscribeParamChanged = bridge.subscribe("param.changed", (event) => {
+      if (event?.id === "mix") setNormalized(event.normalized);
+    });
   })
   .catch((error) => {
     if (bridgeStatus) {
@@ -28,7 +40,7 @@ function begin(event) {
 function perform() {
   if (!mix) return;
   const normalized = Number(mix.value);
-  if (value) value.value = normalized.toFixed(3);
+  setNormalized(normalized);
   bridge?.performParamEdit("mix", normalized);
 }
 
@@ -53,3 +65,5 @@ bridge?.subscribe("meter.main", (frame) => {
   if (peak) peak.value = String(nextPeak);
   if (meterValue) meterValue.value = nextPeak.toFixed(3);
 });
+
+window.addEventListener("pagehide", () => unsubscribeParamChanged?.(), { once: true });

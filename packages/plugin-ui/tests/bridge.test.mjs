@@ -78,6 +78,7 @@ function readyPayload(overrides = {}) {
         midiMappings: []
       }
     ],
+    paramValues: [{ id: "gain", normalized: 0.5 }],
     snapshot: {
       revision: 0,
       paramsRevision: 0,
@@ -982,6 +983,103 @@ function readyPayload(overrides = {}) {
   deliverResponse(host, posted[2], { ready: true });
 
   assert.equal((await retry).editorSessionId, "editor-after-invalid-schema");
+}
+
+{
+  const missingParamValues = readyPayload({ editorSessionId: "editor-missing-param-values" });
+  delete missingParamValues.paramValues;
+
+  const duplicateParamValues = readyPayload({ editorSessionId: "editor-duplicate-param-values" });
+  duplicateParamValues.params.push({
+    ...duplicateParamValues.params[0],
+    id: "mix",
+    name: "Mix"
+  });
+  duplicateParamValues.paramValues.push({ id: "gain", normalized: 0.25 });
+
+  const invalidParamValues = [
+    [missingParamValues, /paramValues must be an array/],
+    [
+      readyPayload({ editorSessionId: "editor-incomplete-param-values", paramValues: [] }),
+      /paramValues must contain one value for every parameter/
+    ],
+    [duplicateParamValues, /duplicate current parameter value 'gain'/],
+    [
+      readyPayload({
+        editorSessionId: "editor-unknown-param-value",
+        paramValues: [{ id: "unknown", normalized: 0.5 }]
+      }),
+      /references an unknown parameter/
+    ],
+    [
+      readyPayload({
+        editorSessionId: "editor-low-param-value",
+        paramValues: [{ id: "gain", normalized: -0.01 }]
+      }),
+      /paramValues\[0\]\.normalized must be within 0\.0\.\.=1\.0/
+    ],
+    [
+      readyPayload({
+        editorSessionId: "editor-high-param-value",
+        paramValues: [{ id: "gain", normalized: 1.01 }]
+      }),
+      /paramValues\[0\]\.normalized must be within 0\.0\.\.=1\.0/
+    ]
+  ];
+
+  for (const [payload, message] of invalidParamValues) {
+    const { host, posted } = makeHost();
+    const bridge = createBridge(host, "pending", { timeoutMs: 0 });
+    const ready = bridge.ready();
+
+    deliverResponse(host, posted[0], payload);
+
+    await assert.rejects(ready, (error) => {
+      assert.equal(error.code, "validation_error");
+      assert.equal(error.retryable, false);
+      assert.match(error.message, message);
+      return true;
+    });
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0].type, "bridge.hello");
+  }
+}
+
+{
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  const timers = [];
+  globalThis.setTimeout = (callback, ms) => {
+    const token = { callback, ms };
+    timers.push(token);
+    return token;
+  };
+  globalThis.clearTimeout = () => {};
+
+  try {
+    const { host, posted } = makeHost();
+    const bridge = createBridge(host, "pending", { timeoutMs: 10 });
+    const ready = bridge.ready();
+    const invalid = readyPayload({
+      editorSessionId: "editor-nan-param-value",
+      paramValues: [{ id: "gain", normalized: Number.NaN }]
+    });
+
+    deliverResponse(host, posted[0], invalid);
+    await Promise.resolve();
+
+    assert.equal(posted.length, 1);
+    assert.equal(timers.length, 1);
+    timers[0].callback();
+    await assert.rejects(ready, (error) => {
+      assert.equal(error.code, "timeout");
+      assert.equal(error.retryable, true);
+      return true;
+    });
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.clearTimeout = realClearTimeout;
+  }
 }
 
 {

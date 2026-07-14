@@ -21,6 +21,7 @@ export type {
   ParamKind,
   ParamMidiMapping,
   ParamSpec,
+  ParamValueSnapshot,
   PluginFaultReport,
   PluginSnapshot,
   RtLogKind,
@@ -752,10 +753,31 @@ function assertParamSpec(value: unknown, index: number, ids: Set<string>): void 
   throw readyPayloadError(`${name}.kind has an unsupported tag`);
 }
 
-function assertReadyParams(value: unknown): void {
+function assertReadyParams(value: unknown): Set<string> {
   if (!Array.isArray(value)) throw readyPayloadError("params must be an array");
   const ids = new Set<string>();
   value.forEach((param, index) => assertParamSpec(param, index, ids));
+  return ids;
+}
+
+function assertReadyParamValues(value: unknown, paramIds: Set<string>): void {
+  if (!Array.isArray(value)) throw readyPayloadError("paramValues must be an array");
+  if (value.length !== paramIds.size) {
+    throw readyPayloadError("paramValues must contain one value for every parameter");
+  }
+  const seen = new Set<string>();
+  value.forEach((entry, index) => {
+    const name = `paramValues[${index}]`;
+    const record = assertRecord(entry, name);
+    const id = assertNonEmptyString(record.id, `${name}.id`);
+    if (!paramIds.has(id)) throw readyPayloadError(`${name}.id references an unknown parameter`);
+    if (seen.has(id)) throw readyPayloadError(`duplicate current parameter value '${id}'`);
+    seen.add(id);
+    const normalized = assertFiniteNumber(record.normalized, `${name}.normalized`);
+    if (normalized < 0 || normalized > 1) {
+      throw readyPayloadError(`${name}.normalized must be within 0.0..=1.0`);
+    }
+  });
 }
 
 function assertCompatibleReadyPayload(payload: unknown): asserts payload is BridgeReadyPayload {
@@ -771,7 +793,8 @@ function assertCompatibleReadyPayload(payload: unknown): asserts payload is Brid
   assertNonEmptyString(ready.pluginName, "pluginName");
   assertNonEmptyString(ready.vendor, "vendor");
   assertCapabilities(ready.capabilities);
-  assertReadyParams(ready.params);
+  const paramIds = assertReadyParams(ready.params);
+  assertReadyParamValues(ready.paramValues, paramIds);
   assertPluginSnapshot(ready.snapshot);
 }
 

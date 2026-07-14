@@ -2,7 +2,50 @@ use proc_macro::TokenStream;
 use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
-use syn::{Data, DeriveInput, Fields, Ident, LitStr, Type, parse_macro_input, spanned::Spanned};
+use syn::{
+    Data, DeriveInput, Fields, Ident, ImplItem, ItemImpl, LitStr, ReturnType, Type,
+    parse_macro_input, spanned::Spanned,
+};
+
+#[proc_macro_attribute]
+pub fn vst3_panic_boundary(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(item as ItemImpl);
+    expand_vst3_panic_boundary(item).into()
+}
+
+fn expand_vst3_panic_boundary(mut item: ItemImpl) -> TokenStream2 {
+    for impl_item in &mut item.items {
+        let ImplItem::Fn(method) = impl_item else {
+            continue;
+        };
+        let body = &method.block;
+        let fallback = panic_fallback(&method.sig.output);
+        method.block = syn::parse_quote!({
+            match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| #body)) {
+                ::std::result::Result::Ok(value) => value,
+                ::std::result::Result::Err(_) => #fallback,
+            }
+        });
+    }
+    quote!(#item)
+}
+
+fn panic_fallback(output: &ReturnType) -> TokenStream2 {
+    let ReturnType::Type(_, ty) = output else {
+        return quote!(());
+    };
+    if let Type::Path(path) = ty.as_ref()
+        && path
+            .path
+            .segments
+            .last()
+            .is_some_and(|segment| segment.ident == "tresult")
+    {
+        quote!(kResultFalse)
+    } else {
+        quote!(::core::default::Default::default())
+    }
+}
 
 #[proc_macro_derive(Params, attributes(param))]
 pub fn derive_params(input: TokenStream) -> TokenStream {
@@ -334,5 +377,26 @@ mod tests {
         let error = expand_params(input).unwrap_err();
 
         assert!(error.to_string().contains("duplicate"));
+    }
+
+    #[test]
+    fn vst3_panic_boundary_wraps_callbacks_with_typed_fallbacks() {
+        let input: ItemImpl = parse_quote! {
+            impl Trait for Type {
+                unsafe fn call(&self) -> tresult {
+                    panic!("boom")
+                }
+
+                unsafe fn pointer(&self) -> *mut u8 {
+                    panic!("boom")
+                }
+            }
+        };
+
+        let expanded = expand_vst3_panic_boundary(input).to_string();
+
+        assert!(expanded.contains("catch_unwind"));
+        assert!(expanded.contains("kResultFalse"));
+        assert!(expanded.contains("Default :: default"));
     }
 }

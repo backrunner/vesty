@@ -10,9 +10,11 @@ const protocolIndex = await readFile(new URL("../dist/protocol/index.d.ts", impo
 assert.match(protocolIndex, /BridgePacket/);
 assert.match(protocolIndex, /ParamMidiMapping/);
 assert.match(protocolIndex, /ParamSpec/);
+assert.match(protocolIndex, /ParamValueSnapshot/);
 
 const ready = await readFile(new URL("../dist/protocol/BridgeReadyPayload.d.ts", import.meta.url), "utf8");
 assert.match(ready, /params: Array<ParamSpec>/);
+assert.match(ready, /paramValues: Array<ParamValueSnapshot>/);
 assert.match(ready, /snapshot: PluginSnapshot/);
 
 const paramSpec = await readFile(new URL("../dist/protocol/ParamSpec.d.ts", import.meta.url), "utf8");
@@ -28,6 +30,13 @@ const paramMidiMapping = await readFile(
 );
 assert.match(paramMidiMapping, /controller: number/);
 assert.match(paramMidiMapping, /channel: number \| null/);
+
+const paramValueSnapshot = await readFile(
+  new URL("../dist/protocol/ParamValueSnapshot.d.ts", import.meta.url),
+  "utf8"
+);
+assert.match(paramValueSnapshot, /id: string/);
+assert.match(paramValueSnapshot, /normalized: number/);
 
 const paramKind = await readFile(new URL("../dist/protocol/ParamKind.d.ts", import.meta.url), "utf8");
 assert.match(paramKind, /"float"/);

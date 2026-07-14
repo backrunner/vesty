@@ -33,8 +33,8 @@ use vesty_core::{
 };
 #[cfg(feature = "wry-ui")]
 use vesty_ipc::{
-    BridgeCapabilities, BridgeErrorCode, BridgeErrorPayload, BridgePacket, BridgeReadyPayload,
-    ParamChangeSource, PluginFaultReport, PluginSnapshot,
+    BridgeCapabilities, BridgeErrorCode, BridgeErrorPayload, BridgeKind, BridgePacket,
+    BridgeReadyPayload, ParamChangeSource, ParamValueSnapshot, PluginFaultReport, PluginSnapshot,
 };
 use vesty_params::{
     ParamCollection, format_normalized_value, normalized_to_plain, parse_normalized_value,
@@ -299,6 +299,7 @@ impl Class for VestyAttributeList {
     type Interfaces = (IAttributeList,);
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl IAttributeListTrait for VestyAttributeList {
     unsafe fn setInt(&self, id: IAttrID, value: int64) -> tresult {
         let Some(key) = attr_key(id) else {
@@ -497,6 +498,7 @@ impl Class for VestyMessage {
     type Interfaces = (IMessage,);
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl IMessageTrait for VestyMessage {
     unsafe fn getMessageID(&self) -> FIDString {
         self.message_id
@@ -764,11 +766,11 @@ pub(crate) struct VestyProcessor<P: Plugin + Default> {
     plugin: P,
     kernel: UnsafeCell<Option<P::Kernel>>,
     events: UnsafeCell<FixedEventList<VestyEvent, MAX_BLOCK_EVENTS>>,
+    final_param_values: UnsafeCell<Vec<Option<f64>>>,
     meter_producer: UnsafeCell<RtMeterProducer>,
     log_producer: UnsafeCell<RtLogProducer>,
     telemetry_id: u64,
     telemetry_registry: Arc<Vst3TelemetryRegistry>,
-    param_ids: Vec<String>,
     vst3_param_ids: Vst3ParamIds,
     sample_rate_bits: AtomicU64,
     max_block_size: AtomicUsize,
@@ -1749,7 +1751,7 @@ impl<P: Plugin + Default> VestyProcessor<P> {
         let specs = plugin.params().specs();
         vesty_params::validate_param_specs(&specs)?;
         let vst3_param_ids = Vst3ParamIds::try_from_specs(&specs)?;
-        let param_ids = specs.into_iter().map(|spec| spec.id).collect();
+        let param_count = specs.len();
         let (telemetry_id, meter_producer, log_producer, fault) =
             telemetry_registry.create_channel();
         let sidechain_arrangement = default_sidechain_arrangement(&plugin);
@@ -1761,11 +1763,11 @@ impl<P: Plugin + Default> VestyProcessor<P> {
             plugin,
             kernel: UnsafeCell::new(None),
             events: UnsafeCell::new(FixedEventList::new()),
+            final_param_values: UnsafeCell::new(vec![None; param_count]),
             meter_producer: UnsafeCell::new(meter_producer),
             log_producer: UnsafeCell::new(log_producer),
             telemetry_id,
             telemetry_registry,
-            param_ids,
             vst3_param_ids,
             sample_rate_bits: AtomicU64::new(44_100.0_f64.to_bits()),
             max_block_size: AtomicUsize::new(1024),
@@ -1844,6 +1846,7 @@ impl<P: Plugin + Default> VestyProcessor<P> {
         &self,
         process_data: &ProcessData,
         events: &mut FixedEventList<VestyEvent, MAX_BLOCK_EVENTS>,
+        final_values: &mut [Option<f64>],
     ) {
         // SAFETY: This block isolates raw host pointers/COM calls inside the VST3 adapter boundary; callers uphold the enclosing unsafe callback contract and nullable pointers are checked before use.
         unsafe {
@@ -1866,11 +1869,10 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                 let Some(param_index) = self.vst3_param_ids.index_for_host_id(host_param_id) else {
                     continue;
                 };
-                let Some(id) = self.param_ids.get(param_index) else {
+                let Some(final_value) = final_values.get_mut(param_index) else {
                     continue;
                 };
 
-                let mut final_value = None;
                 for point_index in 0..point_count {
                     let mut sample_offset = 0;
                     let mut value = 0.0;
@@ -1881,7 +1883,7 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                     }
 
                     let normalized = value.clamp(0.0, 1.0);
-                    final_value = Some(normalized);
+                    *final_value = Some(normalized);
                     let _ = events.push(VestyEvent::Param {
                         sample_offset: sample_offset.max(0) as u32,
                         handle: vesty_params::ParamHandle::from_index(param_index),
@@ -1889,11 +1891,19 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                         normalized,
                     });
                 }
-
-                if let Some(value) = final_value {
-                    let _ = self.plugin.params().set_normalized(id, value);
-                }
             }
+        }
+    }
+
+    fn apply_final_parameter_values(&self, final_values: &[Option<f64>]) {
+        for (index, value) in final_values.iter().copied().enumerate() {
+            let Some(value) = value else {
+                continue;
+            };
+            let _ = self
+                .plugin
+                .params()
+                .set_normalized_by_handle(vesty_params::ParamHandle::from_index(index), value);
         }
     }
 
@@ -2369,6 +2379,7 @@ impl<P: Plugin + Default> Drop for VestyProcessor<P> {
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> IPluginBaseTrait for VestyProcessor<P> {
     unsafe fn initialize(&self, _context: *mut FUnknown) -> tresult {
         kResultOk
@@ -2379,6 +2390,7 @@ impl<P: Plugin + Default> IPluginBaseTrait for VestyProcessor<P> {
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> IComponentTrait for VestyProcessor<P> {
     unsafe fn getControllerClassId(&self, class_id: *mut TUID) -> tresult {
         if class_id.is_null() {
@@ -2600,7 +2612,13 @@ impl<P: Plugin + Default> IComponentTrait for VestyProcessor<P> {
         unsafe {
             if state != 0 {
                 self.ensure_kernel();
+                if let Some(kernel) = (&mut *self.kernel.get()).as_mut() {
+                    kernel.reset();
+                }
             } else {
+                if let Some(kernel) = (&mut *self.kernel.get()).as_mut() {
+                    kernel.reset();
+                }
                 *self.kernel.get() = None;
             }
             kResultOk
@@ -2637,6 +2655,7 @@ impl<P: Plugin + Default> IComponentTrait for VestyProcessor<P> {
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> IAudioProcessorTrait for VestyProcessor<P> {
     unsafe fn setBusArrangements(
         &self,
@@ -2768,16 +2787,32 @@ impl<P: Plugin + Default> IAudioProcessorTrait for VestyProcessor<P> {
                     sample_rate,
                     max_block_size,
                 });
+                kernel.reset();
             } else {
                 self.ensure_kernel();
+                if let Some(kernel) = (&mut *self.kernel.get()).as_mut() {
+                    kernel.reset();
+                }
             }
             kResultOk
         }
     }
 
     unsafe fn setProcessing(&self, state: TBool) -> tresult {
-        self.processing_active.store(state != 0, Ordering::Release);
-        kResultOk
+        // SAFETY: Lifecycle callbacks are serialized by the VST3 host outside the process call.
+        unsafe {
+            let active = state != 0;
+            if active {
+                self.ensure_kernel();
+                if let Some(kernel) = (&mut *self.kernel.get()).as_mut() {
+                    kernel.resume();
+                }
+            } else if let Some(kernel) = (&mut *self.kernel.get()).as_mut() {
+                kernel.suspend();
+            }
+            self.processing_active.store(active, Ordering::Release);
+            kResultOk
+        }
     }
 
     unsafe fn process(&self, data: *mut ProcessData) -> tresult {
@@ -2842,13 +2877,15 @@ impl<P: Plugin + Default> IAudioProcessorTrait for VestyProcessor<P> {
             }
             let events = &mut *self.events.get();
             events.clear();
-            self.collect_parameter_changes(process_data, events);
+            let final_param_values = &mut *self.final_param_values.get();
+            final_param_values.fill(None);
+            self.collect_parameter_changes(process_data, events, final_param_values);
             self.collect_input_events(process_data, events);
             sort_events_by_sample_offset(events);
             let transport = self.transport(process_data);
             let process_mode = vst3_process_mode(process_data);
 
-            match symbolic_sample_size {
+            let result = match symbolic_sample_size {
                 SymbolicSampleSizes_::kSample32 => {
                     self.process_sample32(process_data, events.as_slice(), transport, process_mode)
                 }
@@ -2856,7 +2893,9 @@ impl<P: Plugin + Default> IAudioProcessorTrait for VestyProcessor<P> {
                     self.process_sample64(process_data, events.as_slice(), transport, process_mode)
                 }
                 _ => kResultOk,
-            }
+            };
+            self.apply_final_parameter_values(final_param_values);
+            result
         }
     }
 
@@ -2865,12 +2904,14 @@ impl<P: Plugin + Default> IAudioProcessorTrait for VestyProcessor<P> {
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> IProcessContextRequirementsTrait for VestyProcessor<P> {
     unsafe fn getProcessContextRequirements(&self) -> u32 {
         0
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> IConnectionPointTrait for VestyProcessor<P> {
     unsafe fn connect(&self, other: *mut IConnectionPoint) -> tresult {
         // SAFETY: This block isolates raw host pointers/COM calls inside the VST3 adapter boundary; callers uphold the enclosing unsafe callback contract and nullable pointers are checked before use.
@@ -2944,6 +2985,8 @@ fn disconnect_connection_point(
 type SharedComponentHandler = Arc<Mutex<Option<ComPtr<IComponentHandler>>>>;
 #[cfg(feature = "wry-ui")]
 type ParamSetter = Arc<dyn Fn(&str, f64) -> HostChangeFlags + Send + Sync>;
+#[cfg(feature = "wry-ui")]
+type ParamValueGetter = Arc<dyn Fn() -> Vec<ParamValueSnapshot> + Send + Sync>;
 
 #[cfg(feature = "wry-ui")]
 #[derive(Clone)]
@@ -2953,6 +2996,7 @@ pub(crate) struct WryBridgeEndpoint {
     param_host_ids: Arc<Vec<ParamID>>,
     handler: SharedComponentHandler,
     set_param: ParamSetter,
+    get_param_values: ParamValueGetter,
     bridge_snapshot: SharedBridgeSnapshot,
     param_changes: SharedParamChangeQueue,
     meters: SharedMeterConsumer,
@@ -3005,6 +3049,7 @@ impl WryBridgeEndpoint {
                 return Vec::new();
             };
             let mut runtime = runtime.borrow_mut();
+            runtime.set_ready_param_values((endpoint.get_param_values)());
             endpoint.sync_bridge_snapshot(&mut runtime, &observed_snapshot_generation);
             runtime.set_fault_report(endpoint.fault_report());
             if runtime.receive_json(&text).is_err() {
@@ -3029,6 +3074,9 @@ impl WryBridgeEndpoint {
                         if let Err(error) = changed {
                             bridge_trace(format!("param_changed_error: {error}"));
                         }
+                    }
+                    if result != kResultOk {
+                        reject_param_gesture_responses(&sent, &gesture, result);
                     }
                 }
             }
@@ -3210,9 +3258,9 @@ impl WryBridgeEndpoint {
                 ParamGesturePhase::Begin => handler.beginEdit(id),
                 ParamGesturePhase::Perform => {
                     let normalized = gesture.normalized.unwrap_or(0.0).clamp(0.0, 1.0);
-                    let changes = (self.set_param)(&gesture.id, normalized);
                     let result = handler.performEdit(id, normalized);
                     if result == kResultOk {
+                        let changes = (self.set_param)(&gesture.id, normalized);
                         let _ = restart_component_for_host_changes(handler, changes);
                     }
                     result
@@ -3221,6 +3269,54 @@ impl WryBridgeEndpoint {
             }
         }
     }
+}
+
+#[cfg(feature = "wry-ui")]
+fn reject_param_gesture_responses(
+    sent: &Rc<RefCell<Vec<BridgePacket>>>,
+    gesture: &ParamGesture,
+    host_result: tresult,
+) {
+    let packet_type = match gesture.phase {
+        ParamGesturePhase::Begin => "param.begin.error",
+        ParamGesturePhase::Perform => "param.perform.error",
+        ParamGesturePhase::End => "param.end.error",
+    };
+    let error = BridgeErrorPayload::new(
+        BridgeErrorCode::HostRejected,
+        "host rejected parameter edit",
+        true,
+    )
+    .with_details(serde_json::json!({ "result": host_result }));
+    for packet in sent.borrow_mut().iter_mut() {
+        if packet
+            .reply_to
+            .as_ref()
+            .is_some_and(|reply_to| gesture.request_ids.contains(reply_to))
+        {
+            packet.kind = BridgeKind::Error;
+            packet.packet_type = packet_type.to_string();
+            packet.payload = None;
+            packet.error = Some(error.clone());
+        }
+    }
+}
+
+#[cfg(feature = "wry-ui")]
+fn current_param_values(
+    params: &dyn ParamCollection,
+    specs: &[vesty_params::ParamSpec],
+) -> Vec<ParamValueSnapshot> {
+    specs
+        .iter()
+        .map(|spec| ParamValueSnapshot {
+            id: spec.id.clone(),
+            normalized: params
+                .get_normalized(&spec.id)
+                .unwrap_or(spec.default_normalized)
+                .clamp(0.0, 1.0),
+        })
+        .collect()
 }
 
 #[cfg(feature = "wry-ui")]
@@ -3344,6 +3440,7 @@ impl VestyPlugView {
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl IPlugViewTrait for VestyPlugView {
     unsafe fn isPlatformTypeSupported(&self, platform_type: FIDString) -> tresult {
         // SAFETY: This block isolates raw host pointers/COM calls inside the VST3 adapter boundary; callers uphold the enclosing unsafe callback contract and nullable pointers are checked before use.
@@ -3677,6 +3774,8 @@ impl<P: Plugin + Default> VestyController<P> {
         self.bind_only_pending_telemetry_consumer();
         let info = P::INFO;
         let plugin = self.plugin.clone();
+        let value_plugin = self.plugin.clone();
+        let value_specs = self.specs.clone();
         let snapshot = self
             .bridge_snapshot
             .lock()
@@ -3696,6 +3795,7 @@ impl<P: Plugin + Default> VestyController<P> {
                 vendor: info.vendor.to_string(),
                 capabilities: BridgeCapabilities::v1_default(),
                 params: self.specs.clone(),
+                param_values: current_param_values(self.plugin.params(), &self.specs),
                 snapshot,
             },
             param_ids: Arc::new(self.specs.iter().map(|spec| spec.id.clone()).collect()),
@@ -3706,6 +3806,9 @@ impl<P: Plugin + Default> VestyController<P> {
             meters: self.meters.clone(),
             logs: self.logs.clone(),
             fault: self.fault.clone(),
+            get_param_values: Arc::new(move || {
+                current_param_values(value_plugin.params(), &value_specs)
+            }),
             set_param: Arc::new(move |id, normalized| {
                 let old = plugin.params().get_normalized(id).unwrap_or(normalized);
                 match plugin.params().set_normalized(id, normalized) {
@@ -4058,6 +4161,7 @@ impl<P: Plugin + Default> VestyController<P> {
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> IMidiMappingTrait for VestyController<P> {
     unsafe fn getMidiControllerAssignment(
         &self,
@@ -4081,6 +4185,7 @@ impl<P: Plugin + Default> IMidiMappingTrait for VestyController<P> {
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> IUnitInfoTrait for VestyController<P> {
     unsafe fn getUnitCount(&self) -> int32 {
         1
@@ -4303,6 +4408,7 @@ impl<P: Plugin + Default> IUnitInfoTrait for VestyController<P> {
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> IProgramListDataTrait for VestyController<P> {
     unsafe fn programDataSupported(&self, listId: ProgramListID) -> tresult {
         let Some(list) = program_list_by_id(self.plugin.as_ref(), listId) else {
@@ -4369,6 +4475,7 @@ impl<P: Plugin + Default> IProgramListDataTrait for VestyController<P> {
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> INoteExpressionControllerTrait for VestyController<P> {
     unsafe fn getNoteExpressionCount(&self, busIndex: int32, channel: int16) -> int32 {
         if !note_expression_bus_channel_valid::<P>(busIndex, channel) {
@@ -4464,6 +4571,7 @@ impl<P: Plugin + Default> INoteExpressionControllerTrait for VestyController<P> 
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> INoteExpressionPhysicalUIMappingTrait for VestyController<P> {
     unsafe fn getPhysicalUIMapping(
         &self,
@@ -4500,6 +4608,7 @@ impl<P: Plugin + Default> INoteExpressionPhysicalUIMappingTrait for VestyControl
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> IPluginBaseTrait for VestyController<P> {
     unsafe fn initialize(&self, _context: *mut FUnknown) -> tresult {
         kResultOk
@@ -4510,6 +4619,7 @@ impl<P: Plugin + Default> IPluginBaseTrait for VestyController<P> {
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> IEditControllerTrait for VestyController<P> {
     unsafe fn setComponentState(&self, state: *mut IBStream) -> tresult {
         // SAFETY: This block isolates raw host pointers/COM calls inside the VST3 adapter boundary; callers uphold the enclosing unsafe callback contract and nullable pointers are checked before use.
@@ -4753,6 +4863,7 @@ impl<P: Plugin + Default> IEditControllerTrait for VestyController<P> {
     }
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> IConnectionPointTrait for VestyController<P> {
     unsafe fn connect(&self, other: *mut IConnectionPoint) -> tresult {
         connect_connection_point(&self.connection, other)
@@ -4802,6 +4913,7 @@ impl<P: Plugin + Default> Class for VestyFactory<P> {
     type Interfaces = (IPluginFactory,);
 }
 
+#[vesty_macros::vst3_panic_boundary]
 impl<P: Plugin + Default> IPluginFactoryTrait for VestyFactory<P> {
     unsafe fn getFactoryInfo(&self, info: *mut PFactoryInfo) -> tresult {
         if info.is_null() {

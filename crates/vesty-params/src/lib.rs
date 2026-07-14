@@ -373,22 +373,13 @@ pub trait ParamCollection {
         self.resolve(id).unwrap_or_else(ParamHandle::invalid)
     }
 
-    fn get_normalized_by_handle(&self, handle: ParamHandle) -> Option<f64> {
-        self.specs()
-            .get(handle.index())
-            .and_then(|spec| self.get_normalized(&spec.id))
-    }
+    fn get_normalized_by_handle(&self, handle: ParamHandle) -> Option<f64>;
 
     fn set_normalized_by_handle(
         &self,
         handle: ParamHandle,
         normalized: f64,
-    ) -> Result<(), ParamError> {
-        let Some(spec) = self.specs().get(handle.index()).cloned() else {
-            return Err(ParamError::Unknown(format!("handle:{}", handle.index())));
-        };
-        self.set_normalized(&spec.id, normalized)
-    }
+    ) -> Result<(), ParamError>;
 }
 
 #[derive(Debug)]
@@ -941,6 +932,23 @@ mod tests {
                 Ok(())
             } else {
                 Err(ParamError::Unknown(id.to_string()))
+            }
+        }
+
+        fn get_normalized_by_handle(&self, handle: ParamHandle) -> Option<f64> {
+            (handle.index() == 0).then(|| self.gain.normalized())
+        }
+
+        fn set_normalized_by_handle(
+            &self,
+            handle: ParamHandle,
+            normalized: f64,
+        ) -> Result<(), ParamError> {
+            if handle.index() == 0 {
+                self.gain.set_normalized(normalized);
+                Ok(())
+            } else {
+                Err(ParamError::Unknown(format!("handle:{}", handle.index())))
             }
         }
     }

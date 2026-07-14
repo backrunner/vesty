@@ -43,6 +43,6 @@
     "test": "npm run build && node tests/bridge.test.mjs && node tests/protocol-files.test.mjs"
   },
   "devDependencies": {
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }

@@ -1,5 +1,5 @@
 ---
 title: Vesty
-description: Realtime-safe VST3 plugins in Rust, with system WebView editors.
+description: Build VST3 effects and instruments in Rust with explicit realtime boundaries and system WebView editors.
 layout: home
 ---

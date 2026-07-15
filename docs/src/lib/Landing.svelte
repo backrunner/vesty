@@ -17,7 +17,7 @@
   ];
 
   const guides = [
-    ['01', 'landing.cardStart', 'landing.cardStartDescription', '/docs'],
+    ['01', 'landing.cardStart', 'landing.cardStartDescription', '/docs/guides/complete-plugin'],
     ['02', 'landing.cardRealtime', 'landing.cardRealtimeDescription', '/docs/concepts/realtime-safety'],
     ['03', 'landing.cardWeb', 'landing.cardWebDescription', '/docs/guides/web-ui'],
     ['04', 'landing.cardShip', 'landing.cardShipDescription', '/docs/tooling/packaging']
@@ -126,12 +126,12 @@
       <div><dt>{context.t('landing.bridge')}</dt><dd>{context.t('landing.bridgeValue')}</dd></div>
       <div><dt>{context.t('landing.editor')}</dt><dd>{context.t('landing.editorValue')}</dd></div>
     </dl>
-    <div class="hero-command" aria-label="Install command"><span>$</span><code>cargo add vesty</code></div>
+    <div class="hero-command" aria-label={context.t('landing.commandLabel')}><span>$</span><code>vesty new my-plugin --template gain</code></div>
   </section>
 
   <section class="signal-section">
     <div class="section-heading">
-      <p>HOST → KERNEL → UI</p>
+      <p>{context.t('landing.systemLabel')}</p>
       <h2>{context.t('landing.signalTitle')}</h2>
       <span>{context.t('landing.signalDescription')}</span>
     </div>
@@ -148,7 +148,7 @@
 
   <section class="explore-section">
     <div class="section-heading compact">
-      <p>DOCUMENTATION MAP</p>
+      <p>{context.t('landing.mapLabel')}</p>
       <h2>{context.t('landing.explore')}</h2>
       <span>{context.t('landing.exploreDescription')}</span>
     </div>

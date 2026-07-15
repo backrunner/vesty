@@ -1,5 +1,5 @@
 ---
 title: Vesty
-description: 使用 Rust 构建实时安全的 VST3 插件，并配合系统 WebView 编辑器。
+description: 使用 Rust 构建 VST3 效果器与乐器，保持明确的实时边界，并使用系统 WebView 开发编辑器。
 layout: home
 ---

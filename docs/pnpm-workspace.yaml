@@ -2,3 +2,6 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
+minimumReleaseAgeExclude:
+  - svedocs-cli@0.1.0-beta.8
+  - svedocs@0.1.0-beta.8

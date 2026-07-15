@@ -6941,7 +6941,7 @@ const REQUIRED_RUST_BASELINE_DEPENDENCIES: &[(&str, &str)] = &[
     ("serde", "1.0.228"),
     ("serde_json", "1.0.150"),
     ("ts-rs", "12.0.1"),
-    ("clap", "4.6.1"),
+    ("clap", "4.6.2"),
     ("mime_guess", "2.0.5"),
     ("plist", "1.10.0"),
     ("proc-macro-crate", "3.5.0"),

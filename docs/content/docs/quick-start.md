@@ -13,9 +13,39 @@ Vesty keeps DSP in Rust while letting you build the editor with familiar web fra
 - Node.js 24 or newer only when the plugin has a Web UI.
 - Platform WebView development libraries when compiling the `wry` backend.
 
-## Add Vesty
+## Install Vesty
 
-Create a Rust library with both `rlib` and `cdylib` outputs:
+Vesty is currently alpha, and its Rust crates and CLI are not yet published to crates.io. Clone the repository, then install the `vesty` command from that checkout:
+
+```bash
+git clone https://github.com/orchiliao/vesty.git
+cd vesty
+cargo install --locked --path crates/vesty-cli
+vesty --help
+```
+
+Cargo installs the executable in its binary directory, normally `~/.cargo/bin`. If your shell cannot find `vesty`, add that directory to `PATH` and open a new terminal. Run `vesty doctor` after installation to inspect the local Rust, platform, WebView, and VST3 tooling.
+
+To update the CLI later, pull the desired Vesty revision and reinstall it:
+
+```bash
+git pull --ff-only
+cargo install --locked --path crates/vesty-cli --force
+```
+
+Keep the checkout because plugin projects use its Rust crates while Vesty remains unpublished.
+
+## Add Vesty to a plugin
+
+Create a Rust library next to the Vesty checkout:
+
+```bash
+cd ..
+cargo new my-plugin --lib
+cd my-plugin
+```
+
+Configure both `rlib` and `cdylib` outputs, then point the dependency at the checkout you just installed from:
 
 ```toml title="Cargo.toml"
 [package]
@@ -27,14 +57,10 @@ edition = "2024"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-vesty = "0.1.0"
+vesty = { path = "../vesty/crates/vesty" }
 ```
 
-Vesty is currently alpha. Inside a checkout of this repository, use a path dependency while developing against unreleased APIs:
-
-```toml
-vesty = { path = "../../crates/vesty" }
-```
+Adjust the relative path if the plugin and Vesty checkout live elsewhere. Pin the checkout to a known commit when you need reproducible builds; updating Vesty can change alpha APIs.
 
 ## Implement a gain effect
 

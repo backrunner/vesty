@@ -8,12 +8,14 @@ Vesty releases are tag-driven. A release tag publishes the framework SDK and CLI
 
 ## Configure repository environments
 
-Create two protected GitHub environments before the first release:
+Complete the first crates.io and npm publications manually. Both registries require a package to exist before its owner can add a trusted publisher. After the packages exist, create two protected GitHub environments with no registry secrets:
 
-- `crates-io` contains a `CRATES_IO_TOKEN` secret with permission to publish only the Vesty crates.
-- `npm` contains an `NPM_TOKEN` secret for the first publication of the four new `@vesty/*` packages. After that bootstrap release, configure `.github/workflows/release.yml` and its `publish-npm` job as the trusted publisher for every package, then remove the long-lived secret. The job automatically uses OIDC when no token is present.
+- `crates-io` protects the `publish-crates` job. For every Vesty crate, add a GitHub trusted publisher with repository owner `orchiliao`, repository name `vesty`, workflow filename `release.yml`, and environment `crates-io`.
+- `npm` protects the `publish-npm` job. For all four `@vesty/*` packages, add a GitHub Actions trusted publisher with repository owner `orchiliao`, repository name `vesty`, workflow filename `release.yml`, and environment `npm`.
 
-Require reviewer approval on both environments. Tag workflows cannot receive secrets from pull requests, but environment approval also prevents an accidental maintainer tag from publishing immediately.
+Require reviewer approval on both environments. The workflow requests GitHub OIDC identity tokens and exchanges them for short-lived registry credentials; it does not read a crates.io or npm publishing secret.
+
+The GitHub repository must exist at `orchiliao/vesty` before either registry publisher is configured. If the final repository owner changes, update the documentation and use that exact owner in all 17 publisher records.
 
 ## Prepare a version
 

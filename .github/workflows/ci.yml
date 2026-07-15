@@ -190,6 +190,40 @@ jobs:
           name: vesty-crate-package
           path: target/crate-package
 
+  release-contract:
+    name: release contract
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Verify repository versions
+        run: |
+          version=$(node -p "require('./packages/plugin-ui/package.json').version")
+          node scripts/release/verify-version.mjs "v${version}"
+
+      - name: Check release scripts
+        run: |
+          bash -n scripts/install.sh
+          bash -n scripts/release/publish-crates.sh
+          bash -n scripts/release/publish-npm.sh
+          pwsh -NoProfile -Command '$errors = $null; [System.Management.Automation.Language.Parser]::ParseFile("scripts/install.ps1", [ref]$null, [ref]$errors) > $null; if ($errors.Count) { $errors | Out-String | Write-Error; exit 1 }'
+
+      - name: Check workflow files
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
+
+      - name: Check versioned CLI templates
+        run: |
+          cargo run -p vesty-cli -- --version
+          cargo test -p vesty-cli cargo_template_can_use_local_vesty_path
+          cargo test -p vesty-cli ui_package_template_can_use_local_plugin_ui_path
+
   dependency-baseline:
     name: dependency baseline
     runs-on: ubuntu-latest

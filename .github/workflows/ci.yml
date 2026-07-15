@@ -416,6 +416,12 @@ jobs:
         with:
           node-version: 24
 
+      - name: Build local JS SDK
+        if: matrix.ui != 'none'
+        run: |
+          npm install
+          npm run build
+
       - name: Generate local path scaffold
         env:
           UI_TEMPLATE: ${{ matrix.ui }}

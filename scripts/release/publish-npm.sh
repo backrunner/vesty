@@ -4,22 +4,6 @@ set -euo pipefail
 release_tag="${VESTY_RELEASE_VERSION:?VESTY_RELEASE_VERSION must contain the v-prefixed release tag}"
 release_version="${release_tag#v}"
 npm_tag="latest"
-npm_user_config=""
-
-cleanup() {
-  if [[ -n "${npm_user_config}" ]]; then
-    rm -f "${npm_user_config}"
-  fi
-}
-
-trap cleanup EXIT
-
-if [[ -n "${NODE_AUTH_TOKEN:-}" ]]; then
-  npm_user_config="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/vesty-release-npmrc"
-  printf '//registry.npmjs.org/:_authToken=%s\n' "${NODE_AUTH_TOKEN}" > "${npm_user_config}"
-  chmod 0600 "${npm_user_config}"
-  export NPM_CONFIG_USERCONFIG="${npm_user_config}"
-fi
 
 if [[ "${release_version}" == *-* ]]; then
   npm_tag="${release_version#*-}"

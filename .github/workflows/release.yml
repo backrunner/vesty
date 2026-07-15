@@ -171,6 +171,9 @@ jobs:
     needs: [validate, build-cli]
     runs-on: ubuntu-latest
     environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
 
@@ -189,9 +192,13 @@ jobs:
       - name: Generate publish plan
         run: cargo run -p vesty-cli -- publish-plan --out target/publish-plan.json
 
+      - name: Authenticate with crates.io
+        id: crates-auth
+        uses: rust-lang/crates-io-auth-action@v1
+
       - name: Publish crates in dependency order
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth.outputs.token }}
           VESTY_RELEASE_VERSION: ${{ github.ref_name }}
         run: bash scripts/release/publish-crates.sh target/publish-plan.json
 
@@ -218,7 +225,6 @@ jobs:
 
       - name: Publish npm packages
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           VESTY_RELEASE_VERSION: ${{ github.ref_name }}
         run: bash scripts/release/publish-npm.sh
 

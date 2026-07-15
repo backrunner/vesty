@@ -11,9 +11,9 @@
   --vesty-paper: #eadfc9;
   --vesty-brick: #9a4335;
   --vesty-black: #191915;
-  --font-sans: "Avenir Next", Avenir, "Helvetica Neue", sans-serif;
-  --font-mono: "American Typewriter", "Courier New", monospace;
-  --sd-font-display: Baskerville, "Iowan Old Style", Georgia, serif;
+  --font-sans: ui-rounded, "SF Pro Rounded", "Avenir Next", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Code", Menlo, Consolas, monospace;
+  --sd-font-display: var(--font-sans);
   --sd-radius: 4px;
 }
 
@@ -100,6 +100,15 @@ body {
   box-shadow: 5px 5px 0 color-mix(in srgb, var(--sd-line) 52%, transparent);
 }
 
+.sd-code,
+.sd-code code,
+.sd-prose pre,
+.sd-prose pre code,
+.sd-prose :not(pre) > code {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+}
+
 .landing-shell {
   width: 100%;
   overflow: hidden;
@@ -153,7 +162,7 @@ body {
   padding-bottom: 17px;
   border-bottom: 1px solid #5c5548;
   color: #a99f8d;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   text-transform: uppercase;
 }
@@ -173,7 +182,7 @@ body {
   gap: 12px;
   margin: 0 0 17px;
   color: #d1c3aa;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   text-transform: uppercase;
 }
@@ -267,7 +276,7 @@ body {
 
 .hero-metrics dt {
   color: #756a58;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 9px;
   text-transform: uppercase;
 }
@@ -321,7 +330,7 @@ body {
 .contract-section > p {
   margin: 6px 0 0;
   color: #9a4335;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -368,7 +377,7 @@ body {
 
 .stage-index {
   color: #9a4335;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   font-weight: 700;
 }
@@ -444,7 +453,7 @@ body {
 
 .guide-grid a > span {
   color: #d5ad57;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   font-weight: 700;
 }

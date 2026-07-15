@@ -1842,16 +1842,16 @@ mod tests {
         let mut binary_paths = validation
             .binary_paths
             .iter()
-            .map(|path| path.strip_prefix(&bundle_dir).unwrap().as_str().to_string())
+            .map(|path| path.strip_prefix(&bundle_dir).unwrap().to_path_buf())
             .collect::<Vec<_>>();
         binary_paths.sort();
 
         assert_eq!(
             binary_paths,
             vec![
-                "Contents/MacOS/Gain",
-                "Contents/x86_64-linux/Gain.so",
-                "Contents/x86_64-win/Gain.vst3",
+                Utf8PathBuf::from("Contents/MacOS/Gain"),
+                Utf8PathBuf::from("Contents/x86_64-linux/Gain.so"),
+                Utf8PathBuf::from("Contents/x86_64-win/Gain.vst3"),
             ]
         );
         assert_eq!(validation.asset_count, 2);
@@ -2030,11 +2030,8 @@ mod tests {
 
         let packaged_path = report.parameter_manifest_path.as_ref().unwrap();
         assert_eq!(
-            packaged_path
-                .strip_prefix(&report.bundle_dir)
-                .unwrap()
-                .as_str(),
-            "Contents/Resources/parameters.manifest.json"
+            packaged_path.strip_prefix(&report.bundle_dir).unwrap(),
+            Utf8Path::new("Contents/Resources/parameters.manifest.json")
         );
         let packaged = read_parameter_manifest(packaged_path).unwrap();
         assert_eq!(packaged, manifest);
@@ -3083,21 +3080,16 @@ sidechain = true
     fn assert_common_bundle_files(report: &PackageReport, binary_relative: &str) {
         assert!(report.binary_path.is_file());
         assert_eq!(
-            report
-                .binary_path
-                .strip_prefix(&report.bundle_dir)
-                .unwrap()
-                .as_str(),
-            binary_relative
+            report.binary_path.strip_prefix(&report.bundle_dir).unwrap(),
+            Utf8Path::new(binary_relative)
         );
         assert!(report.moduleinfo_path.is_file());
         assert_eq!(
             report
                 .moduleinfo_path
                 .strip_prefix(&report.bundle_dir)
-                .unwrap()
-                .as_str(),
-            "Contents/Resources/moduleinfo.json"
+                .unwrap(),
+            Utf8Path::new("Contents/Resources/moduleinfo.json")
         );
         assert!(
             report

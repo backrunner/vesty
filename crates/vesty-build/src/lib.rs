@@ -3655,6 +3655,7 @@ class_id = "01234567-89ab-cdef-0123-456789abcdef"
         assert!(matches!(error, BuildError::SymlinkAsset(_)));
     }
 
+    #[cfg(unix)]
     fn test_parameter_manifest() -> ParameterManifest {
         ParameterManifest::from_param_specs(vec![vesty_params::ParamSpec::float(
             "gain", "Gain", 0.0, 1.0, 0.5,

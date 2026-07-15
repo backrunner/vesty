@@ -5,7 +5,7 @@ plan_path="${1:-target/publish-plan.json}"
 release_tag="${VESTY_RELEASE_VERSION:?VESTY_RELEASE_VERSION must contain the v-prefixed release tag}"
 release_version="${release_tag#v}"
 
-: "${CARGO_REGISTRY_TOKEN:?CRATES_IO_TOKEN must be exposed as CARGO_REGISTRY_TOKEN}"
+: "${CARGO_REGISTRY_TOKEN:?the crates.io trusted publisher token must be exposed as CARGO_REGISTRY_TOKEN}"
 
 if [[ ! -f "${plan_path}" ]]; then
   echo "publish plan not found: ${plan_path}" >&2

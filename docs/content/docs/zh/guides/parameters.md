@@ -52,11 +52,11 @@ fn create_kernel(&self, _init: KernelInit) -> FilterKernel {
 ## 生成参数清单
 
 ```bash
-cargo run -p vesty-cli -- param-manifest \
+vesty param-manifest \
   --specs params.specs.json \
   --out vesty-parameters.json
 
-cargo run -p vesty-cli -- param-manifest \
+vesty param-manifest \
   --specs params.specs.json \
   --out vesty-parameters.json \
   --check

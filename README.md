@@ -26,28 +26,25 @@ Requirements:
 - Node.js 24 or newer for the UI packages
 - Platform WebView development libraries when enabling the `wry` backend
 
-```bash
-git clone https://github.com/orchiliao/vesty.git
-cd vesty
-
-cargo test --workspace
-npm install
-npm test
-```
-
-Build the example plugins:
+Install the prebuilt CLI from the latest GitHub Release:
 
 ```bash
-cargo build \
-  -p vesty-example-gain \
-  -p vesty-example-midi-synth \
-  -p vesty-example-web-ui-param-demo \
-  --release
-
-npm run build --prefix examples/web-ui-param-demo/ui
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://raw.githubusercontent.com/orchiliao/vesty/main/scripts/install.sh | sh
+vesty --version
+vesty doctor
 ```
 
-Use `cargo run -p vesty-cli -- --help` to inspect the available project, package, validation, and release commands.
+Then create a plugin from an embedded starter:
+
+```bash
+vesty templates
+vesty new my-plugin --template gain
+cd my-plugin
+cargo test
+```
+
+Windows users can run `irm https://raw.githubusercontent.com/orchiliao/vesty/main/scripts/install.ps1 | iex` in PowerShell. Source checkout instructions remain available for contributors and unreleased development.
 
 The complete English and Simplified Chinese guides live in [`docs/`](docs/). Start with the [complete plugin tutorial](docs/content/docs/guides/complete-plugin.md) for the path from scaffold to validated VST3 bundle.
 

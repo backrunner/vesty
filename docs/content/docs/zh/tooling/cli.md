@@ -7,9 +7,9 @@ order: 1
 ## 查看命令
 
 ```bash
-cargo run -p vesty-cli -- --help
-cargo run -p vesty-cli -- package --help
-cargo run -p vesty-cli -- release-check --help
+vesty --help
+vesty package --help
+vesty release-check --help
 ```
 
 ## 创建工程

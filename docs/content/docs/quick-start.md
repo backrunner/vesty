@@ -15,56 +15,47 @@ Vesty keeps DSP in Rust while letting you build the editor with familiar web fra
 
 ## Install Vesty
 
-Vesty is currently alpha, and its Rust crates and CLI are not yet published to crates.io. Clone the repository, then install the `vesty` command from that checkout:
+Install the prebuilt CLI from GitHub Releases. The installer selects the archive for your platform, verifies its SHA-256 checksum, and writes `vesty` to `~/.local/bin` by default.
 
 ```bash
-git clone https://github.com/orchiliao/vesty.git
-cd vesty
-cargo install --locked --path crates/vesty-cli
-vesty --help
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://raw.githubusercontent.com/orchiliao/vesty/main/scripts/install.sh | sh
 ```
 
-Cargo installs the executable in its binary directory, normally `~/.cargo/bin`. If your shell cannot find `vesty`, add that directory to `PATH` and open a new terminal. Run `vesty doctor` after installation to inspect the local Rust, platform, WebView, and VST3 tooling.
+On Windows PowerShell:
 
-To update the CLI later, pull the desired Vesty revision and reinstall it:
-
-```bash
-git pull --ff-only
-cargo install --locked --path crates/vesty-cli --force
+```powershell
+irm https://raw.githubusercontent.com/orchiliao/vesty/main/scripts/install.ps1 | iex
 ```
 
-Keep the checkout because plugin projects use its Rust crates while Vesty remains unpublished.
+The installers use the latest stable GitHub Release. To install an alpha, beta, or other specific version, set `VESTY_VERSION` to the v-prefixed tag listed on the Releases page. You can also download an archive and `SHA256SUMS` manually from the same release.
 
-## Add Vesty to a plugin
-
-Create a Rust library next to the Vesty checkout:
+Verify the CLI and inspect the local toolchain:
 
 ```bash
-cd ..
-cargo new my-plugin --lib
+vesty --version
+vesty doctor
+```
+
+If the shell cannot find `vesty`, add `~/.local/bin` to `PATH` and open a new terminal.
+
+## Create a plugin
+
+List the built-in starters, then scaffold the headless gain effect used in this guide:
+
+```bash
+vesty templates
+vesty new my-plugin --template gain
 cd my-plugin
 ```
 
-Configure both `rlib` and `cdylib` outputs, then point the dependency at the checkout you just installed from:
+The CLI writes the plugin metadata, parameter manifest, `vesty.toml`, and a Rust dependency pinned to the framework version that matches the CLI. Use `--template web-ui-param-demo`, `--template vue-ui-param-demo`, or `--template svelte-ui-param-demo` when you want a Web editor from the start.
 
-```toml title="Cargo.toml"
-[package]
-name = "my-plugin"
-version = "0.1.0"
-edition = "2024"
+## Inspect the gain effect
 
-[lib]
-crate-type = ["rlib", "cdylib"]
+The generated `src/lib.rs` follows this minimal structure:
 
-[dependencies]
-vesty = { path = "../vesty/crates/vesty" }
-```
-
-Adjust the relative path if the plugin and Vesty checkout live elsewhere. Pin the checkout to a known commit when you need reproducible builds; updating Vesty can change alpha APIs.
-
-## Implement a gain effect
-
-```rust title="src/lib.rs"
+```rust title="src/lib.rs (abridged)"
 use vesty::prelude::*;
 
 #[derive(Params)]

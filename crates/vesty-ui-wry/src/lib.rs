@@ -37,7 +37,9 @@ use std::collections::BTreeMap;
 #[cfg(all(feature = "wry-backend", target_os = "windows"))]
 use std::num::NonZeroIsize;
 #[cfg(feature = "wry-backend")]
-use std::{borrow::Cow, cell::Cell, ffi::c_void, path::PathBuf, ptr::NonNull, rc::Rc};
+use std::{borrow::Cow, cell::Cell, path::PathBuf, rc::Rc};
+#[cfg(all(feature = "wry-backend", target_os = "macos"))]
+use std::{ffi::c_void, ptr::NonNull};
 
 #[derive(Debug, Error)]
 pub enum WryBridgeError {

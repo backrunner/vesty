@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::process::{Command, Output};
+use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use vesty_build::{
     AssetManifest, BinaryExportCheck, BundlePlatform, BundleValidationReport,
@@ -536,12 +537,30 @@ enum Vst3SdkCommand {
     },
 }
 
+const CLI_STACK_SIZE: usize = 8 * 1024 * 1024;
+
 fn main() {
-    let cli = Cli::parse();
-    if let Err(error) = run(cli) {
+    let worker = thread::Builder::new()
+        .name("vesty-cli".to_string())
+        .stack_size(CLI_STACK_SIZE)
+        .spawn(cli_main);
+    let result = match worker {
+        Ok(worker) => match worker.join() {
+            Ok(result) => result,
+            Err(payload) => std::panic::resume_unwind(payload),
+        },
+        Err(error) => Err(format!("failed to start CLI worker: {error}")),
+    };
+
+    if let Err(error) = result {
         eprintln!("error: {error}");
         std::process::exit(1);
     }
+}
+
+fn cli_main() -> Result<(), String> {
+    let cli = Cli::parse();
+    run(cli).map_err(|error| error.to_string())
 }
 
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
@@ -6916,7 +6935,7 @@ const REQUIRED_RUST_BASELINE_DEPENDENCIES: &[(&str, &str)] = &[
     ("proc-macro2", "1.0.106"),
     ("quote", "1.0.46"),
     ("schemars", "1.2.1"),
-    ("syn", "2.0.118"),
+    ("syn", "2.0.119"),
     ("toml", "1.1.3"),
     ("sha2", "0.11.0"),
     ("tempfile", "3.27.0"),
@@ -7117,7 +7136,7 @@ struct CommandLatestDependencyFetcher;
 
 impl LatestDependencyFetcher for CommandLatestDependencyFetcher {
     fn latest_crate_version(&self, name: &str) -> Result<String, String> {
-        latest_crate_version_from_cargo_search(name)
+        latest_crate_version_from_crates_io(name)
     }
 
     fn latest_npm_version(&self, name: &str) -> Result<String, String> {
@@ -7349,6 +7368,77 @@ fn latest_crate_version_from_cargo_search(name: &str) -> Result<String, String> 
         .unwrap_or_else(|| "cargo search failed".to_string());
     latest_crate_version_from_cargo_info(name)
         .map_err(|info_error| format!("{search_error}; cargo info fallback failed: {info_error}"))
+}
+
+fn latest_crate_version_from_crates_io(name: &str) -> Result<String, String> {
+    if !name
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    {
+        return Err(format!("invalid crates.io crate name `{name}`"));
+    }
+
+    let url = format!("https://crates.io/api/v1/crates/{name}");
+    let user_agent = format!(
+        "User-Agent: vesty-cli/{} (https://github.com/backrunner/vesty)",
+        env!("CARGO_PKG_VERSION")
+    );
+    let output = Command::new("curl")
+        .args([
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--location",
+            "--retry",
+            "3",
+            "--retry-delay",
+            "1",
+            "--retry-all-errors",
+            "--max-time",
+            "30",
+            "--header",
+            &user_agent,
+            &url,
+        ])
+        .output();
+
+    let api_result = match output {
+        Ok(output) if output.status.success() => {
+            let body = String::from_utf8_lossy(&output.stdout);
+            parse_crates_io_latest_version(&body)
+                .ok_or_else(|| format!("crates.io response did not include a version for `{name}`"))
+        }
+        Ok(output) => Err(format!(
+            "crates.io API failed with status {}; stderr: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        )),
+        Err(error) => Err(format!("failed to run curl for crates.io API: {error}")),
+    };
+
+    if api_result.is_ok() {
+        return api_result;
+    }
+    let api_error = api_result
+        .err()
+        .unwrap_or_else(|| "crates.io API query failed".to_string());
+    latest_crate_version_from_cargo_search(name)
+        .map_err(|cargo_error| format!("{api_error}; cargo fallback failed: {cargo_error}"))
+}
+
+fn parse_crates_io_latest_version(body: &str) -> Option<String> {
+    let response: serde_json::Value = serde_json::from_str(body).ok()?;
+    let crate_data = response.get("crate")?;
+    crate_data
+        .get("max_stable_version")
+        .and_then(serde_json::Value::as_str)
+        .or_else(|| {
+            crate_data
+                .get("max_version")
+                .and_then(serde_json::Value::as_str)
+        })
+        .filter(|version| !version.is_empty())
+        .map(str::to_string)
 }
 
 fn latest_crate_version_from_cargo_search_only(name: &str) -> Result<String, String> {
@@ -27121,6 +27211,23 @@ wry-webkit = "0.1.0"
             Some("0.55.1")
         );
         assert!(parse_cargo_search_latest_version("missing", output).is_none());
+    }
+
+    #[test]
+    fn parses_crates_io_latest_version_response() {
+        let stable = r#"{"crate":{"max_stable_version":"0.55.1","max_version":"0.56.0-beta.1"}}"#;
+        assert_eq!(
+            parse_crates_io_latest_version(stable).as_deref(),
+            Some("0.55.1")
+        );
+
+        let prerelease_only = r#"{"crate":{"max_stable_version":null,"max_version":"1.0.0-rc.1"}}"#;
+        assert_eq!(
+            parse_crates_io_latest_version(prerelease_only).as_deref(),
+            Some("1.0.0-rc.1")
+        );
+        assert!(parse_crates_io_latest_version(r#"{"crate":{}}"#).is_none());
+        assert!(parse_crates_io_latest_version("not json").is_none());
     }
 
     #[test]

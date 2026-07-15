@@ -1,12 +1,12 @@
 ---
 title: Build a complete plugin
-description: Take a stereo gain effect from scaffold to DAW-ready VST3 bundle.
+description: Take a stereo gain effect from a scaffold to a DAW-ready VST3 bundle.
 order: 1
 ---
 
 This tutorial builds **Signal Gain**, a stereo VST3 effect with sample-accurate gain automation, bypass, a testable DSP kernel, an optional WebView editor, and reproducible package validation. It is deliberately small enough to understand in one sitting, but it crosses the same boundaries as a larger equalizer, compressor, or synthesizer.
 
-At the end you will have a loadable `.vst3` bundle. A bundle that passes local validation is suitable for development testing; it is not a public release until the [release evidence](/docs/tooling/release-evidence) matrix is complete.
+At the end, you will have a loadable `.vst3` bundle. A bundle that passes local validation is suitable for development testing; it is not ready for public release until the [release evidence](/docs/tooling/release-evidence) matrix is complete.
 
 ## 1. Prepare the toolchain
 
@@ -258,7 +258,7 @@ vesty::export_vst3!(SignalGain);
 
 This callback performs bounded arithmetic and writes borrowed host buffers. It does not allocate, lock, log, parse JSON, access disk, or call the WebView. A production gain plugin may also smooth sharp steps to avoid clicks; keep the smoother state in `SignalKernel` and update it without allocation.
 
-If input and output channel counts differ, the loop handles only matched channels. A more complex bus layout must explicitly clear every output it does not write.
+If the input and output channel counts differ, the loop handles only matched channels. A more complex bus layout must explicitly clear every output it does not write.
 
 ## 7. Test the kernel without a DAW
 

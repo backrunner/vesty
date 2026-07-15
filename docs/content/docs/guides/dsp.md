@@ -1,6 +1,6 @@
 ---
 title: DSP kernels
-description: Prepare, process, and test bounded native audio work.
+description: Prepare, process, and test native DSP within realtime constraints.
 order: 2
 ---
 
@@ -42,7 +42,7 @@ The context carries sorted parameter and note events plus a transport snapshot. 
 
 ## Double precision
 
-The default path is f32. Opt into native f64 processing only when the algorithm benefits:
+The default path uses `f32`. Opt into native `f64` processing only when the algorithm benefits:
 
 ```rust
 impl AudioKernel for MasteringKernel {
@@ -65,4 +65,3 @@ Without the opt-in, Vesty uses preallocated f64↔f32 scratch conversion for hos
 ## Testing
 
 Test the kernel independently of a DAW, then run the adapter suites for automation, buses, events, silence flags, and capacity limits. A host smoke test is still required before release.
-

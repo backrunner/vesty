@@ -49,7 +49,7 @@ export default defineConfig({
       ]
     },
     home: {
-      primaryAction: { label: 'Start building', labelKey: 'home.primaryAction', href: '/docs' },
+      primaryAction: { label: 'Start building', labelKey: 'home.primaryAction', href: '/docs/quick-start' },
       secondaryAction: { label: 'Read the architecture', labelKey: 'home.secondaryAction', href: '/docs/concepts/architecture' }
     }
   },

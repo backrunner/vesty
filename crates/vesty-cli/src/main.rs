@@ -1898,7 +1898,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "release evidence template".to_string(),
             status: "ok".to_string(),
-            path: Some(dir.to_string()),
+            path: Some(portable_report_path(dir)),
             value: format!("{created} template file(s) created; existing files preserved"),
         });
     }
@@ -1909,7 +1909,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "protocol snapshot".to_string(),
             status: "ok".to_string(),
-            path: Some(protocol_snapshot.to_string()),
+            path: Some(portable_report_path(protocol_snapshot)),
             value: format!(
                 "{} TypeScript file(s), {} JSON schema file(s)",
                 report.typescript_files, report.json_schema_files
@@ -1926,7 +1926,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "crate publish plan".to_string(),
             status: "ok".to_string(),
-            path: Some(path.to_string()),
+            path: Some(portable_report_path(&path)),
             value: format!(
                 "{} publishable crates; {} private skipped; final crate: {}",
                 evidence.package_count, evidence.skipped_private_count, evidence.final_package
@@ -1942,7 +1942,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "crate package readiness".to_string(),
             status: "ok".to_string(),
-            path: Some(path.to_string()),
+            path: Some(portable_report_path(&path)),
             value: format!(
                 "{} packageable now; {} deferred until internal dependencies publish",
                 evidence.packaged_count, evidence.deferred_count
@@ -1959,7 +1959,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "npm package pack report".to_string(),
             status: "ok".to_string(),
-            path: Some(path.to_string()),
+            path: Some(portable_report_path(&path)),
             value: format!(
                 "{} package(s), {} file(s): {}",
                 evidence.package_count,
@@ -1978,7 +1978,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "dependency latest baseline".to_string(),
             status: "ok".to_string(),
-            path: Some(path.to_string()),
+            path: Some(portable_report_path(&path)),
             value: format!(
                 "{} baseline check(s), {} latest registry check(s)",
                 evidence.baseline_checks, evidence.latest_checks
@@ -1997,7 +1997,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "vst3 SDK header manifest".to_string(),
             status: "ok".to_string(),
-            path: Some(manifest_path.to_string()),
+            path: Some(portable_report_path(&manifest_path)),
             value: format!(
                 "{} required header(s); Steinberg SDK {}; upstream vst3 crate {}",
                 manifest_evidence.header_count,
@@ -2017,7 +2017,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "vst3 SDK generated bindings plan".to_string(),
             status: "ok".to_string(),
-            path: Some(binding_plan_path.to_string()),
+            path: Some(portable_report_path(&binding_plan_path)),
             value: format!(
                 "{}; {} required header(s); active backend {}; module {}",
                 plan_evidence.status,
@@ -2037,7 +2037,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "vst3 SDK generated bindings surface".to_string(),
             status: "ok".to_string(),
-            path: Some(binding_surface_path.to_string()),
+            path: Some(portable_report_path(&binding_surface_path)),
             value: format!(
                 "{}; {} required header(s); {} symbol(s); active backend {}; bindings generated false",
                 surface_evidence.status,
@@ -2057,7 +2057,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "vst3 SDK generated bindings scaffold".to_string(),
             status: "ok".to_string(),
-            path: Some(scaffold_path.to_string()),
+            path: Some(portable_report_path(&scaffold_path)),
             value: format!(
                 "metadata scaffold; {} required header(s); active backend {}; bindings generated false",
                 scaffold.plan.header_manifest.headers.len(),
@@ -2072,7 +2072,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "vst3 SDK generated bindings ABI seed".to_string(),
             status: "ok".to_string(),
-            path: Some(abi_seed_path.to_string()),
+            path: Some(portable_report_path(&abi_seed_path)),
             value: format!(
                 "ABI seed aliases/constants; {} required header(s); {} symbol(s); active backend {}; full COM bindings generated false",
                 abi_seed.plan.header_manifest.headers.len(),
@@ -2088,7 +2088,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "vst3 SDK generated bindings ABI layout".to_string(),
             status: "ok".to_string(),
-            path: Some(abi_path.to_string()),
+            path: Some(portable_report_path(&abi_path)),
             value: format!(
                 "ABI layout module; {} required header(s); {} symbol(s); active backend {}; layout fingerprints present; full COM bindings generated false",
                 abi.plan.header_manifest.headers.len(),
@@ -2107,7 +2107,7 @@ fn collect_local_release_evidence(
         items.push(LocalReleaseEvidenceItem {
             name: "vst3 SDK generated bindings interface skeleton".to_string(),
             status: "ok".to_string(),
-            path: Some(interface_skeleton_path.to_string()),
+            path: Some(portable_report_path(&interface_skeleton_path)),
             value: format!(
                 "interface/vtable skeleton module; {} required header(s); {} symbol(s); active backend {}; full COM bindings generated false",
                 interface_skeleton.plan.header_manifest.headers.len(),
@@ -2118,11 +2118,11 @@ fn collect_local_release_evidence(
     }
 
     let report = LocalReleaseEvidenceReport {
-        evidence_dir: dir.to_string(),
-        workspace: workspace.to_string(),
+        evidence_dir: portable_report_path(dir),
+        workspace: portable_report_path(workspace),
         protocol_snapshot: options
             .protocol
-            .then(|| protocol_snapshot.to_string()),
+            .then(|| portable_report_path(protocol_snapshot)),
         items,
         external_evidence_note: "collect-local only gathers local protocol/publish/npm, opt-in dependency latest review and explicitly requested VST3 SDK audit evidence; DAW matrix, platform smoke, validator, CI, signing and notarization evidence must come from real external runs".to_string(),
     };
@@ -2258,8 +2258,8 @@ fn import_ci_release_evidence(options: ImportCiOptions) -> Result<(), Box<dyn st
     }
 
     let report = ImportCiReleaseEvidenceReport {
-        evidence_dir: options.dir.to_string(),
-        source: options.source.to_string(),
+        evidence_dir: portable_report_path(&options.dir),
+        source: portable_report_path(&options.source),
         items,
         external_evidence_note: "import-ci only copies artifacts whose content is recognized by the release evidence parsers; it does not create DAW, platform smoke, validator-passed, signing or notarization passes by itself".to_string(),
     };
@@ -2628,7 +2628,7 @@ fn import_ci_json_artifact(
 }
 
 fn recognized_json_artifact_name_from_path(path: &Utf8Path) -> Option<(&'static str, String)> {
-    let path_lower = path.as_str().to_ascii_lowercase();
+    let path_lower = portable_report_path(path).to_ascii_lowercase();
     let file_lower = path.file_name()?.to_ascii_lowercase();
     let stem_lower = path.file_stem().unwrap_or("").to_ascii_lowercase();
 
@@ -3932,7 +3932,7 @@ fn validate_release_action_item_evidence_path(
         return Ok(());
     };
     match action.evidence_path.as_deref() {
-        Some(actual) if actual == expected => Ok(()),
+        Some(actual) if release_report_paths_equal(actual, &expected) => Ok(()),
         Some(actual) => Err(format!(
             "release action `{}` evidence path `{actual}` does not match expected `{expected}`",
             action.check
@@ -4981,8 +4981,8 @@ fn import_ci_item(
     ImportCiReleaseEvidenceItem {
         name: name.to_string(),
         status: status.to_string(),
-        source: source.map(ToString::to_string),
-        path: path.map(ToString::to_string),
+        source: source.map(portable_report_path),
+        path: path.map(portable_report_path),
         value: sanitize_release_report_text(value),
     }
 }
@@ -5059,7 +5059,7 @@ fn validate_collected_release_evidence_report_shape(
         .into());
     }
     if let Some(expected) = expected_collected_release_evidence_output_path(report)?
-        && report.output != expected
+        && !release_report_paths_equal(&report.output, &expected)
     {
         return Err(format!(
             "collected release evidence output `{}` does not match expected `{expected}` for kind `{}`",
@@ -5085,7 +5085,7 @@ fn validate_collected_release_evidence_report_shape(
                 "collected release evidence dir",
                 &report.evidence_dir,
             )?;
-            if path != &report.output {
+            if !release_report_paths_equal(path, &report.output) {
                 return Err(format!(
                     "collected release evidence item `{}` path `{path}` must match report output `{}`",
                     item.name, report.output
@@ -5154,7 +5154,7 @@ fn validate_local_release_evidence_item_paths(
             &report.evidence_dir,
         )?;
         if let Some(expected) = expected_local_release_evidence_item_path(report, item)
-            && path != &expected
+            && !release_report_paths_equal(path, &expected)
         {
             return Err(format!(
                 "local release evidence item `{}` path `{path}` does not match expected `{expected}`",
@@ -5191,7 +5191,12 @@ fn validate_local_release_evidence_protocol_consistency(
                 .into());
             }
             let item = protocol_items[0];
-            if item.status != "ok" || item.path.as_deref() != Some(protocol_snapshot) {
+            if item.status != "ok"
+                || !item
+                    .path
+                    .as_deref()
+                    .is_some_and(|path| release_report_paths_equal(path, protocol_snapshot))
+            {
                 return Err(format!(
                     "local release protocol snapshot `{protocol_snapshot}` does not match protocol snapshot item status/path"
                 )
@@ -5395,7 +5400,7 @@ fn validate_import_ci_release_evidence_item_paths(
             &report.evidence_dir,
         )?;
         if let Some(expected) = expected_import_ci_release_evidence_item_path(report, item)
-            && path != &expected
+            && !release_report_paths_equal(path, &expected)
         {
             return Err(format!(
                 "import-ci item `{}` path `{path}` does not match expected `{expected}`",
@@ -5444,7 +5449,7 @@ fn validate_release_evidence_template_item_path(
     path: &str,
     evidence_dir: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if item_name == "release evidence template" && path != evidence_dir {
+    if item_name == "release evidence template" && !release_report_paths_equal(path, evidence_dir) {
         return Err(
             format!("{label} `{path}` must match release evidence dir `{evidence_dir}`").into(),
         );
@@ -5594,7 +5599,7 @@ fn signed_bundle_evidence_relative_output_path_is_allowed(relative: &[String]) -
 fn validate_import_ci_release_evidence_success_output_uniqueness(
     report: &ImportCiReleaseEvidenceReport,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut seen_paths = BTreeMap::<&str, &str>::new();
+    let mut seen_paths = BTreeMap::<String, &str>::new();
     for item in &report.items {
         if !matches!(item.status.as_str(), "ok" | "imported") {
             continue;
@@ -5602,7 +5607,15 @@ fn validate_import_ci_release_evidence_success_output_uniqueness(
         let Some(path) = item.path.as_deref() else {
             continue;
         };
-        if let Some(previous_name) = seen_paths.insert(path, item.name.as_str()) {
+        let key = lexical_release_report_path(path)
+            .map(|path| format!("{}|{}", path.prefix, path.components.join("/")))
+            .map_err(|error| {
+                format!(
+                    "import-ci item `{}` output path `{path}` is not a safe report path: {error}",
+                    item.name
+                )
+            })?;
+        if let Some(previous_name) = seen_paths.insert(key, item.name.as_str()) {
             return Err(format!(
                 "import-ci item `{}` output path `{path}` duplicates successful item `{previous_name}`",
                 item.name
@@ -6065,13 +6078,13 @@ fn collect_signing_release_evidence(
     }
 
     let report = CollectedReleaseEvidenceReport {
-        evidence_dir: options.dir.to_string(),
+        evidence_dir: portable_report_path(&options.dir),
         kind: "signing".to_string(),
-        output: output_path.to_string(),
+        output: portable_report_path(&output_path),
         items: vec![LocalReleaseEvidenceItem {
             name: format!("{} signing verification", expected.label()),
             status: "ok".to_string(),
-            path: Some(output_path.to_string()),
+            path: Some(portable_report_path(&output_path)),
             value: format!("{} {}", command.program, command.args.join(" ")),
         }],
     };
@@ -6123,13 +6136,13 @@ fn collect_notarization_release_evidence(
     }
 
     let report = CollectedReleaseEvidenceReport {
-        evidence_dir: options.dir.to_string(),
+        evidence_dir: portable_report_path(&options.dir),
         kind: "notarization".to_string(),
-        output: output_path.to_string(),
+        output: portable_report_path(&output_path),
         items: vec![LocalReleaseEvidenceItem {
             name: "macOS notarization".to_string(),
             status: "ok".to_string(),
-            path: Some(output_path.to_string()),
+            path: Some(portable_report_path(&output_path)),
             value: "accepted notarytool result and stapler success".to_string(),
         }],
     };
@@ -10541,9 +10554,9 @@ fn build_release_action_plan(
             skipped,
             action_count: actions.len(),
         },
-        protocol_snapshot: protocol_snapshot.to_string(),
-        evidence_root: evidence_root.map(ToString::to_string),
-        release_evidence_dir: release_evidence_dir.map(ToString::to_string),
+        protocol_snapshot: portable_report_path(protocol_snapshot),
+        evidence_root: evidence_root.map(portable_report_path),
+        release_evidence_dir: release_evidence_dir.map(portable_report_path),
         actions,
     }
 }
@@ -10598,17 +10611,15 @@ fn release_action_evidence_path(
             .iter()
             .find(|row| row["host"].as_str() == Some(host))
             .and_then(|row| row["evidence"].as_str())
-            .map(ToString::to_string);
+            .and_then(normalize_report_path);
     }
     if check.name == "daw matrix" {
-        return Some(
-            evidence_root
-                .unwrap_or_else(|| Utf8Path::new("target/daw-evidence"))
-                .to_string(),
-        );
+        return Some(portable_report_path(
+            evidence_root.unwrap_or_else(|| Utf8Path::new("target/daw-evidence")),
+        ));
     }
     if check.name == "protocol snapshot" {
-        return Some(protocol_snapshot.to_string());
+        return Some(portable_report_path(protocol_snapshot));
     }
 
     let base = release_evidence_dir.unwrap_or_else(|| Utf8Path::new("target/release-evidence"));
@@ -10641,7 +10652,7 @@ fn release_action_evidence_path(
         "notarization log" => "notary.log",
         _ => return None,
     };
-    Some(base.join(relative).to_string())
+    Some(portable_report_path(&base.join(relative)))
 }
 
 fn release_action_commands(
@@ -10652,10 +10663,10 @@ fn release_action_commands(
     release_evidence_dir: Option<&Utf8Path>,
 ) -> Vec<String> {
     let evidence_root_text = evidence_root
-        .map(ToString::to_string)
+        .map(portable_report_path)
         .unwrap_or_else(|| "target/daw-evidence".to_string());
     let release_evidence_text = release_evidence_dir
-        .map(ToString::to_string)
+        .map(portable_report_path)
         .unwrap_or_else(|| "target/release-evidence".to_string());
 
     if check.name == "daw matrix" {
@@ -11265,7 +11276,7 @@ fn json_value_looks_like_non_validate_release_artifact(path: &Utf8Path, text: &s
         return false;
     };
 
-    let path_lower = path.as_str().to_ascii_lowercase();
+    let path_lower = portable_report_path(path).to_ascii_lowercase();
     let file_lower = path.file_name().unwrap_or_default().to_ascii_lowercase();
     if file_lower.contains("release-check")
         || path_lower.contains("/ci-release-checks/")
@@ -11292,7 +11303,7 @@ fn json_value_looks_like_non_validate_release_artifact(path: &Utf8Path, text: &s
 }
 
 fn validate_report_path_prefers_static(path: &Utf8Path) -> bool {
-    let path_lower = path.as_str().to_ascii_lowercase();
+    let path_lower = portable_report_path(path).to_ascii_lowercase();
     let file_lower = path.file_name().unwrap_or_default().to_ascii_lowercase();
     path_lower.contains("/package/")
         || path_lower.contains("/static-validate/")
@@ -11300,7 +11311,7 @@ fn validate_report_path_prefers_static(path: &Utf8Path) -> bool {
 }
 
 fn validate_report_path_prefers_release(path: &Utf8Path) -> bool {
-    let path_lower = path.as_str().to_ascii_lowercase();
+    let path_lower = portable_report_path(path).to_ascii_lowercase();
     let file_lower = path.file_name().unwrap_or_default().to_ascii_lowercase();
     path_lower.contains("/validator/")
         || file_lower.contains(".validate.")
@@ -12284,7 +12295,7 @@ fn vst3_sdk_manifest_release_check(path: Option<&Utf8Path>) -> ReleaseCheckItem 
         Err(error) => ReleaseCheckItem {
             name: "vst3 SDK header manifest".to_string(),
             status: "failed".to_string(),
-            value: format!("{path}: {error}"),
+            value: format!("{}: {error}", portable_report_path(path)),
             hint: Some(
                 "regenerate from the official Steinberg VST3 SDK checkout with `vesty vst3-sdk manifest`"
                     .to_string(),
@@ -12750,7 +12761,7 @@ fn vst3_sdk_binding_plan_release_check(path: Option<&Utf8Path>) -> ReleaseCheckI
         Err(error) => ReleaseCheckItem {
             name: "vst3 SDK generated bindings plan".to_string(),
             status: "failed".to_string(),
-            value: format!("{path}: {error}"),
+            value: format!("{}: {error}", portable_report_path(path)),
             hint: Some(
                 "regenerate with `vesty vst3-sdk binding-plan` from the official Steinberg VST3 SDK checkout"
                     .to_string(),
@@ -12896,7 +12907,7 @@ fn vst3_sdk_binding_surface_release_check(path: Option<&Utf8Path>) -> ReleaseChe
         Err(error) => ReleaseCheckItem {
             name: "vst3 SDK generated bindings surface".to_string(),
             status: "failed".to_string(),
-            value: format!("{path}: {error}"),
+            value: format!("{}: {error}", portable_report_path(path)),
             hint: Some(
                 "regenerate with `vesty vst3-sdk binding-surface` from the official Steinberg VST3 SDK checkout"
                     .to_string(),
@@ -13220,7 +13231,7 @@ fn optional_vst3_sdk_rust_artifact_release_check(
         Err(error) => ReleaseCheckItem {
             name: name.to_string(),
             status: "failed".to_string(),
-            value: format!("{path}: {error}"),
+            value: format!("{}: {error}", portable_report_path(path)),
             hint: Some(
                 "regenerate this optional VST3 SDK audit artifact from the official Steinberg VST3 SDK checkout"
                     .to_string(),
@@ -13447,7 +13458,7 @@ fn ci_release_check_artifacts_release_check(
         let Some(os) = artifact.os else {
             failures.push(format!(
                 "{}: could not infer OS from artifact path",
-                artifact.path
+                portable_report_path(&artifact.path)
             ));
             continue;
         };
@@ -14493,7 +14504,7 @@ fn smoke_host_ui_assets_check(
         ),
         Err(error) => smoke_host_failed(
             format!("{example} UI assets"),
-            format!("{root}: {error}"),
+            format!("{}: {error}", portable_report_path(&root)),
             "run the example UI build command before smoke-host",
         ),
     }
@@ -15681,6 +15692,31 @@ fn normalize_report_path(path: &str) -> Option<String> {
     } else {
         Some(normalized)
     }
+}
+
+fn portable_report_path(path: &Utf8Path) -> String {
+    path.as_str().replace('\\', "/")
+}
+
+fn release_report_paths_equal(left: &str, right: &str) -> bool {
+    match (
+        lexical_release_report_path(left),
+        lexical_release_report_path(right),
+    ) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+fn release_report_path_ends_with(path: &str, suffix: &str) -> bool {
+    let (Ok(path), Ok(suffix)) = (
+        lexical_release_report_path(path),
+        lexical_release_report_path(suffix),
+    ) else {
+        return false;
+    };
+    path.components.ends_with(&suffix.components)
 }
 
 fn report_path_components(path: &str) -> Option<Vec<String>> {
@@ -18562,7 +18598,7 @@ fn bundle_signing_command(
                     "--timestamp".to_string(),
                     "--sign".to_string(),
                     identity.to_string(),
-                    bundle_dir.to_string(),
+                    portable_report_path(bundle_dir),
                 ],
             })
         }
@@ -18582,7 +18618,7 @@ fn bundle_signing_command(
                     "http://timestamp.digicert.com".to_string(),
                     "/n".to_string(),
                     identity.to_string(),
-                    binary_path.to_string(),
+                    portable_report_path(binary_path),
                 ],
             })
         }
@@ -18626,7 +18662,7 @@ fn signing_verification_command(
                     "--deep".to_string(),
                     "--strict".to_string(),
                     "--verbose=2".to_string(),
-                    bundle_dir.to_string(),
+                    portable_report_path(bundle_dir),
                 ],
             })
         }
@@ -18644,7 +18680,7 @@ fn signing_verification_command(
                     "verify".to_string(),
                     "/pa".to_string(),
                     "/v".to_string(),
-                    binary_path.to_string(),
+                    portable_report_path(&binary_path),
                 ],
             })
         }
@@ -24551,9 +24587,9 @@ Result: 47 tests passed, 0 tests failed
             let actual_bytes = package
                 .get(relative)
                 .unwrap_or_else(|| panic!("missing generated protocol source: {relative}"));
-            if actual_bytes != expected_bytes {
-                let expected = String::from_utf8_lossy(expected_bytes);
-                let actual = String::from_utf8_lossy(actual_bytes);
+            let expected = String::from_utf8_lossy(expected_bytes).replace("\r\n", "\n");
+            let actual = String::from_utf8_lossy(actual_bytes).replace("\r\n", "\n");
+            if actual != expected {
                 assert_eq!(
                     actual, expected,
                     "@vesty/plugin-ui protocol source drifted: {relative}"
@@ -24574,6 +24610,24 @@ Result: 47 tests passed, 0 tests failed
             extra.is_empty(),
             "@vesty/plugin-ui has stale generated protocol sources: {extra:?}"
         );
+    }
+
+    #[test]
+    fn release_report_paths_are_portable_across_windows_and_unix_separators() {
+        let windows = r"C:\artifacts\release-evidence\package\VestyGain.static-validate.json";
+        let portable = "C:/artifacts/release-evidence/package/VestyGain.static-validate.json";
+
+        assert!(release_report_paths_equal(windows, portable));
+        assert!(release_report_path_ends_with(
+            windows,
+            "package/VestyGain.static-validate.json"
+        ));
+        assert_eq!(portable_report_path(Utf8Path::new(windows)), portable);
+        assert_eq!(
+            recognized_json_artifact_name_from_path(Utf8Path::new(windows)).map(|(name, _)| name),
+            Some("vst3 static validate report")
+        );
+        assert!(validate_report_path_prefers_static(Utf8Path::new(windows)));
     }
 
     #[test]
@@ -25476,7 +25530,7 @@ Result: 47 tests passed, 0 tests failed
             .expect("daw matrix action");
         assert_eq!(
             daw_matrix.evidence_path.as_deref(),
-            Some(evidence_root.as_str())
+            Some(portable_report_path(&evidence_root).as_str())
         );
 
         let cubase = plan
@@ -25487,7 +25541,7 @@ Result: 47 tests passed, 0 tests failed
         assert_eq!(cubase.priority, "required");
         assert_eq!(
             cubase.evidence_path.as_deref(),
-            Some(evidence_root.join("cubase").as_str())
+            Some(portable_report_path(&evidence_root.join("cubase")).as_str())
         );
         assert!(cubase.commands.iter().any(|command| {
             command.contains("vesty daw-matrix --write-report --host cubase-nuendo")
@@ -25501,7 +25555,7 @@ Result: 47 tests passed, 0 tests failed
         assert_eq!(platform.priority, "required");
         assert_eq!(
             platform.evidence_path.as_deref(),
-            Some(release_evidence_dir.join("platform-smoke").as_str())
+            Some(portable_report_path(&release_evidence_dir.join("platform-smoke")).as_str())
         );
         assert!(
             platform
@@ -25529,9 +25583,10 @@ Result: 47 tests passed, 0 tests failed
         assert_eq!(
             crate_package.evidence_path.as_deref(),
             Some(
-                release_evidence_dir
-                    .join("crate-package/crate-package.json")
-                    .as_str()
+                portable_report_path(
+                    &release_evidence_dir.join("crate-package/crate-package.json")
+                )
+                .as_str()
             )
         );
         assert!(
@@ -25620,7 +25675,7 @@ Result: 47 tests passed, 0 tests failed
             .expect("protocol snapshot action");
         assert_eq!(
             protocol_action.evidence_path.as_deref(),
-            Some(protocol.as_str())
+            Some(portable_report_path(&protocol).as_str())
         );
 
         let ci_run_url = plan
@@ -29273,7 +29328,11 @@ license: MIT
         );
 
         assert_eq!(manifest_check.status, "failed");
-        assert!(manifest_check.value.contains(manifest.as_str()));
+        assert!(
+            manifest_check
+                .value
+                .contains(&portable_report_path(&manifest))
+        );
         assert!(
             manifest_check
                 .value
@@ -29282,7 +29341,11 @@ license: MIT
             manifest_check.value
         );
         assert_eq!(plan_check.status, "failed");
-        assert!(plan_check.value.contains(binding_plan.as_str()));
+        assert!(
+            plan_check
+                .value
+                .contains(&portable_report_path(&binding_plan))
+        );
         assert!(
             plan_check
                 .value
@@ -29291,7 +29354,11 @@ license: MIT
             plan_check.value
         );
         assert_eq!(surface_check.status, "failed");
-        assert!(surface_check.value.contains(binding_surface.as_str()));
+        assert!(
+            surface_check
+                .value
+                .contains(&portable_report_path(&binding_surface))
+        );
         assert!(
             surface_check
                 .value
@@ -29300,7 +29367,11 @@ license: MIT
             surface_check.value
         );
         assert_eq!(scaffold_check.status, "failed");
-        assert!(scaffold_check.value.contains(scaffold.as_str()));
+        assert!(
+            scaffold_check
+                .value
+                .contains(&portable_report_path(&scaffold))
+        );
         assert!(
             scaffold_check
                 .value
@@ -29309,7 +29380,11 @@ license: MIT
             scaffold_check.value
         );
         assert_eq!(abi_seed_check.status, "failed");
-        assert!(abi_seed_check.value.contains(abi_seed.as_str()));
+        assert!(
+            abi_seed_check
+                .value
+                .contains(&portable_report_path(&abi_seed))
+        );
         assert!(
             abi_seed_check
                 .value
@@ -29318,7 +29393,7 @@ license: MIT
             abi_seed_check.value
         );
         assert_eq!(abi_check.status, "failed");
-        assert!(abi_check.value.contains(abi.as_str()));
+        assert!(abi_check.value.contains(&portable_report_path(&abi)));
         assert!(
             abi_check
                 .value
@@ -29327,7 +29402,11 @@ license: MIT
             abi_check.value
         );
         assert_eq!(interface_check.status, "failed");
-        assert!(interface_check.value.contains(interface_skeleton.as_str()));
+        assert!(
+            interface_check
+                .value
+                .contains(&portable_report_path(&interface_skeleton))
+        );
         assert!(
             interface_check
                 .value
@@ -29751,7 +29830,10 @@ license: MIT
         assert!(items.iter().any(|item| {
             item.name == "ci run url"
                 && item.status == "imported"
-                && item.source.as_deref() == Some(file.as_str())
+                && item
+                    .source
+                    .as_deref()
+                    .is_some_and(|source| release_report_paths_equal(source, file.as_str()))
         }));
     }
 
@@ -29849,7 +29931,7 @@ license: MIT
                 && item
                     .source
                     .as_deref()
-                    .is_some_and(|source| source.ends_with("ci-run-url.txt"))
+                    .is_some_and(|source| release_report_path_ends_with(source, "ci-run-url.txt"))
         }));
         assert!(report.items.iter().any(|item| {
             item.name == "text artifact"
@@ -29857,7 +29939,7 @@ license: MIT
                 && item
                     .source
                     .as_deref()
-                    .is_some_and(|source| source.ends_with("notes.txt"))
+                    .is_some_and(|source| release_report_path_ends_with(source, "notes.txt"))
         }));
     }
 
@@ -32847,7 +32929,10 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert_eq!(mac.args[0], "--verify");
         assert!(mac.args.contains(&"--deep".to_string()));
         assert!(mac.args.contains(&"--strict".to_string()));
-        assert_eq!(mac.args.last().map(String::as_str), Some(bundle.as_str()));
+        assert_eq!(
+            mac.args.last().map(String::as_str),
+            Some(portable_report_path(&bundle).as_str())
+        );
         assert_eq!(
             default_signing_evidence_path(&root, BundlePlatform::Macos),
             root.join("signing-macos.log")
@@ -32864,7 +32949,7 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert_eq!(windows.args[..3], ["verify", "/pa", "/v"]);
         assert_eq!(
             windows.args.last().map(String::as_str),
-            Some(windows_binary.as_str())
+            Some(portable_report_path(&windows_binary).as_str())
         );
         assert_eq!(
             default_signing_evidence_path(&root, BundlePlatform::WindowsX64),
@@ -33296,21 +33381,21 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
             &fs::read_to_string(root.join("local-collect-report.json")).unwrap(),
         )
         .unwrap();
-        assert_eq!(report.evidence_dir, root.to_string());
+        assert_eq!(report.evidence_dir, portable_report_path(&root));
         assert_eq!(report.items.len(), 3);
         assert!(
             report
                 .external_evidence_note
                 .contains("must come from real external runs")
         );
-        assert!(
-            report
-                .items
-                .iter()
-                .any(|item| item.name == "protocol snapshot"
-                    && item.status == "ok"
-                    && item.path.as_deref() == Some(protocol.as_str()))
-        );
+        assert!(report.items.iter().any(|item| {
+            item.name == "protocol snapshot"
+                && item.status == "ok"
+                && item
+                    .path
+                    .as_deref()
+                    .is_some_and(|path| release_report_paths_equal(path, protocol.as_str()))
+        }));
         assert!(
             report
                 .items
@@ -33423,43 +33508,63 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 SDK header manifest"
                 && item.status == "ok"
-                && item.path.as_deref() == Some(manifest.as_str())
+                && item
+                    .path
+                    .as_deref()
+                    .is_some_and(|path| release_report_paths_equal(path, manifest.as_str()))
         }));
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 SDK generated bindings plan"
                 && item.status == "ok"
-                && item.path.as_deref() == Some(binding_plan.as_str())
+                && item
+                    .path
+                    .as_deref()
+                    .is_some_and(|path| release_report_paths_equal(path, binding_plan.as_str()))
                 && item.value.contains(bindings_module.as_str())
         }));
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 SDK generated bindings surface"
                 && item.status == "ok"
-                && item.path.as_deref() == Some(binding_surface.as_str())
+                && item
+                    .path
+                    .as_deref()
+                    .is_some_and(|path| release_report_paths_equal(path, binding_surface.as_str()))
                 && item.value.contains("bindings generated false")
         }));
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 SDK generated bindings scaffold"
                 && item.status == "ok"
-                && item.path.as_deref() == Some(scaffold.as_str())
+                && item
+                    .path
+                    .as_deref()
+                    .is_some_and(|path| release_report_paths_equal(path, scaffold.as_str()))
                 && item.value.contains("bindings generated false")
         }));
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 SDK generated bindings ABI seed"
                 && item.status == "ok"
-                && item.path.as_deref() == Some(abi_seed.as_str())
+                && item
+                    .path
+                    .as_deref()
+                    .is_some_and(|path| release_report_paths_equal(path, abi_seed.as_str()))
                 && item.value.contains("full COM bindings generated false")
         }));
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 SDK generated bindings ABI layout"
                 && item.status == "ok"
-                && item.path.as_deref() == Some(abi.as_str())
+                && item
+                    .path
+                    .as_deref()
+                    .is_some_and(|path| release_report_paths_equal(path, abi.as_str()))
                 && item.value.contains("layout fingerprints present")
                 && item.value.contains("full COM bindings generated false")
         }));
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 SDK generated bindings interface skeleton"
                 && item.status == "ok"
-                && item.path.as_deref() == Some(interface_skeleton.as_str())
+                && item.path.as_deref().is_some_and(|path| {
+                    release_report_paths_equal(path, interface_skeleton.as_str())
+                })
                 && item.value.contains("full COM bindings generated false")
         }));
 
@@ -34550,10 +34655,9 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 validate report"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("Windows/VestyGain.validate.json"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "Windows/VestyGain.validate.json")
+                })
                 && item.value.contains("artifact path indicates windows-x64")
                 && item.value.contains("report platform is macos")
         }));
@@ -34561,7 +34665,10 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
             item.name == "vst3 validate report"
                 && item.status == "failed"
                 && item.source.as_deref().is_some_and(|source| {
-                    source.ends_with("validator/VestyGain.macos.windows-x64.validate.json")
+                    release_report_path_ends_with(
+                        source,
+                        "validator/VestyGain.macos.windows-x64.validate.json",
+                    )
                 })
                 && item
                     .value
@@ -34572,10 +34679,9 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 static validate report"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("macOS/ThirdParty.static-validate.json"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "macOS/ThirdParty.static-validate.json")
+                })
                 && item.value.contains("artifact path indicates macos")
                 && item.value.contains("report platform is windows-x64")
         }));
@@ -34932,7 +35038,10 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
             item.name == "vst3 SDK generated bindings interface skeleton"
                 && item.status == "failed"
                 && item.source.as_deref().is_some_and(|source| {
-                    source.ends_with("vst3-sdk/stale-generated-interface-skeleton.rs")
+                    release_report_path_ends_with(
+                        source,
+                        "vst3-sdk/stale-generated-interface-skeleton.rs",
+                    )
                 })
                 && item.value.contains(
                     "missing vesty-vst3-sys binary export inspection tool plan `linux-x64/llvm-nm`",
@@ -35075,10 +35184,9 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 static validate report"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("package/report.json"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "package/report.json")
+                })
         }));
         assert!(report.items.iter().any(|item| {
             item.name == "platform smoke artifact"
@@ -35107,10 +35215,9 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 SDK generated bindings scaffold"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("vst3-sdk/generated.rs"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "vst3-sdk/generated.rs")
+                })
                 && item
                     .value
                     .contains("must not claim SDK bindings are generated")
@@ -35118,10 +35225,9 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 SDK generated bindings ABI seed"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("vst3-sdk/generated-abi-seed.rs"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "vst3-sdk/generated-abi-seed.rs")
+                })
                 && item
                     .value
                     .contains("must not claim full COM bindings are generated")
@@ -35129,10 +35235,9 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "vst3 SDK generated bindings ABI layout"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("vst3-sdk/generated-abi.rs"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "vst3-sdk/generated-abi.rs")
+                })
                 && item
                     .value
                     .contains("must not claim full COM bindings are generated")
@@ -35141,7 +35246,10 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
             item.name == "vst3 SDK generated bindings interface skeleton"
                 && item.status == "failed"
                 && item.source.as_deref().is_some_and(|source| {
-                    source.ends_with("vst3-sdk/generated-interface-skeleton.rs")
+                    release_report_path_ends_with(
+                        source,
+                        "vst3-sdk/generated-interface-skeleton.rs",
+                    )
                 })
                 && item
                     .value
@@ -35153,7 +35261,7 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
                 && item
                     .source
                     .as_deref()
-                    .is_some_and(|source| source.ends_with("notes.json"))
+                    .is_some_and(|source| release_report_path_ends_with(source, "notes.json"))
         }));
     }
 
@@ -35223,7 +35331,7 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
                 && item
                     .source
                     .as_deref()
-                    .is_some_and(|source| source.ends_with("notes.txt"))
+                    .is_some_and(|source| release_report_path_ends_with(source, "notes.txt"))
         }));
     }
 
@@ -35259,10 +35367,9 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "signed bundle evidence"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("signed-marker.log"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "signed-marker.log")
+                })
                 && item.value.contains("no positive signing marker found")
         }));
         assert!(report.items.iter().any(|item| {
@@ -35271,7 +35378,7 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
                 && item
                     .source
                     .as_deref()
-                    .is_some_and(|source| source.ends_with("notes.txt"))
+                    .is_some_and(|source| release_report_path_ends_with(source, "notes.txt"))
         }));
     }
 
@@ -35307,10 +35414,9 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "notarization log"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("notary-generic.log"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "notary-generic.log")
+                })
                 && item
                     .value
                     .contains("accepted notarytool output and stapler success")
@@ -35360,30 +35466,27 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "notarization log"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("Windows/notary.log"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "Windows/notary.log")
+                })
                 && item.value.contains("artifact path indicates Windows")
                 && item.value.contains("notarization evidence is macOS-only")
         }));
         assert!(report.items.iter().any(|item| {
             item.name == "notarization log"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("Linux/stapler.log"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "Linux/stapler.log")
+                })
                 && item.value.contains("artifact path indicates Linux")
                 && item.value.contains("notarization evidence is macOS-only")
         }));
         assert!(report.items.iter().any(|item| {
             item.name == "notarization log"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("notary-macos-windows.log"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "notary-macos-windows.log")
+                })
                 && item
                     .value
                     .contains("notarization evidence file name contains multiple platform labels")
@@ -35451,20 +35554,18 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "signed bundle evidence"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("Windows/signing.log"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "Windows/signing.log")
+                })
                 && item.value.contains("artifact path indicates Windows")
                 && item.value.contains("signing evidence platform is macOS")
         }));
         assert!(report.items.iter().any(|item| {
             item.name == "signed bundle evidence"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("signing/signing-macos-windows.log"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "signing/signing-macos-windows.log")
+                })
                 && item
                     .value
                     .contains("signing evidence file name contains multiple platform labels")
@@ -35474,10 +35575,9 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "signed bundle evidence"
                 && item.status == "failed"
-                && item
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.ends_with("Windows/VestyGain.vst3"))
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_path_ends_with(source, "Windows/VestyGain.vst3")
+                })
                 && item.value.contains("artifact path indicates Windows")
                 && item.value.contains("signing evidence platform is macOS")
         }));
@@ -35537,12 +35637,17 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "signed bundle evidence"
                 && item.status == "imported"
-                && item.source.as_deref() == Some(valid_bundle.as_str())
+                && item
+                    .source
+                    .as_deref()
+                    .is_some_and(|source| release_report_paths_equal(source, valid_bundle.as_str()))
         }));
         assert!(report.items.iter().any(|item| {
             item.name == "signed bundle evidence"
                 && item.status == "failed"
-                && item.source.as_deref() == Some(placeholder_bundle.as_str())
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_paths_equal(source, placeholder_bundle.as_str())
+                })
                 && item.path.is_none()
                 && item
                     .value
@@ -35551,7 +35656,9 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(report.items.iter().any(|item| {
             item.name == "signed bundle evidence"
                 && item.status == "failed"
-                && item.source.as_deref() == Some(missing_code_resources_bundle.as_str())
+                && item.source.as_deref().is_some_and(|source| {
+                    release_report_paths_equal(source, missing_code_resources_bundle.as_str())
+                })
                 && item.path.is_none()
                 && item
                     .value

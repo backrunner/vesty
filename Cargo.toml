@@ -35,7 +35,7 @@ arc-swap = "1.9.2"
 atomic_float = "1.1.0"
 camino = "1.2.4"
 cargo_metadata = "0.23.1"
-clap = { version = "4.6.1", features = ["derive"] }
+clap = { version = "4.6.2", features = ["derive"] }
 mime_guess = "2.0.5"
 plist = "1.10.0"
 proc-macro-crate = "3.5.0"

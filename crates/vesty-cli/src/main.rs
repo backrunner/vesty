@@ -14,6 +14,7 @@ use vesty_build::{
 #[derive(Parser)]
 #[command(name = "vesty")]
 #[command(about = "Vesty VST3 plugin framework tooling")]
+#[command(version)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -20291,7 +20292,7 @@ fn default_param_specs_json(kind: &str) -> &'static str {
 fn cargo_toml(plugin_name: &str, crate_name: &str, vesty_path: Option<&Utf8Path>) -> String {
     let vesty_dependency = match vesty_path {
         Some(path) => format!(r#"vesty = {{ path = "{}" }}"#, toml_escape(path.as_str())),
-        None => r#"vesty = "0.1""#.to_string(),
+        None => format!(r#"vesty = "={}""#, env!("CARGO_PKG_VERSION")),
     };
     format!(
         r#"[package]
@@ -20887,11 +20888,11 @@ fn ui_package_json(template: UiTemplate, package_paths: &UiPackagePaths) -> Stri
         .plugin_ui
         .as_deref()
         .map(|path| format!("file:{}", path.as_str()))
-        .unwrap_or_else(|| "latest".to_string());
+        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
     let adapter_dependency = package_paths
         .adapter_path(template)
         .map(|path| format!("file:{}", path.as_str()))
-        .unwrap_or_else(|| "latest".to_string());
+        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
     let typecheck_script = match template {
         UiTemplate::Vue => "vue-tsc --noEmit",
         UiTemplate::Svelte => "svelte-check --tsconfig ./tsconfig.json",
@@ -37157,7 +37158,7 @@ bridge timeout
     #[test]
     fn cargo_template_can_use_local_vesty_path() {
         let published = cargo_toml("Demo Plugin", "demo", None);
-        assert!(published.contains(r#"vesty = "0.1""#));
+        assert!(published.contains(&format!(r#"vesty = "={}""#, env!("CARGO_PKG_VERSION"))));
         assert!(published.contains("[workspace]"));
         assert!(published.contains("publish = false"));
         assert!(published.contains(r#"description = "Demo Plugin VST3 plugin""#));
@@ -37461,7 +37462,10 @@ bridge timeout
         let published = ui_package_json(UiTemplate::Vanilla, &UiPackagePaths::default());
         let value = serde_json::from_str::<serde_json::Value>(&published).unwrap();
         assert_eq!(value["private"], true);
-        assert_eq!(value["dependencies"]["@vesty/plugin-ui"], "latest");
+        assert_eq!(
+            value["dependencies"]["@vesty/plugin-ui"],
+            env!("CARGO_PKG_VERSION")
+        );
     }
 
     #[test]
@@ -37578,7 +37582,10 @@ bridge timeout
             match template {
                 UiTemplate::React => {
                     let app = fs::read_to_string(root.join("ui/src/App.tsx")).unwrap();
-                    assert_eq!(package["dependencies"]["@vesty/react"], "latest");
+                    assert_eq!(
+                        package["dependencies"]["@vesty/react"],
+                        env!("CARGO_PKG_VERSION")
+                    );
                     assert!(package_json.contains("\"react\""));
                     assert!(package_json.contains("\"@vitejs/plugin-react\""));
                     assert_eq!(package["scripts"]["typecheck"], "tsc --noEmit");
@@ -37597,7 +37604,10 @@ bridge timeout
                 }
                 UiTemplate::Vue => {
                     let app = fs::read_to_string(root.join("ui/src/App.vue")).unwrap();
-                    assert_eq!(package["dependencies"]["@vesty/vue"], "latest");
+                    assert_eq!(
+                        package["dependencies"]["@vesty/vue"],
+                        env!("CARGO_PKG_VERSION")
+                    );
                     assert!(package_json.contains("\"vue\""));
                     assert!(package_json.contains("\"@vitejs/plugin-vue\""));
                     assert_eq!(package["scripts"]["typecheck"], "vue-tsc --noEmit");
@@ -37615,7 +37625,10 @@ bridge timeout
                 }
                 UiTemplate::Svelte => {
                     let app = fs::read_to_string(root.join("ui/src/App.svelte")).unwrap();
-                    assert_eq!(package["dependencies"]["@vesty/svelte"], "latest");
+                    assert_eq!(
+                        package["dependencies"]["@vesty/svelte"],
+                        env!("CARGO_PKG_VERSION")
+                    );
                     assert!(package_json.contains("\"svelte\""));
                     assert!(package_json.contains("\"@sveltejs/vite-plugin-svelte\""));
                     assert_eq!(

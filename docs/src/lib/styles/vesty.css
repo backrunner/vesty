@@ -109,6 +109,43 @@ body {
   font-variant-ligatures: none;
 }
 
+.sd-sidebar-chevron {
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1rem;
+  border: 1px solid color-mix(in srgb, var(--sd-line) 72%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sd-panel) 62%, transparent);
+  transform: none;
+  transition: color .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.sd-sidebar-list[data-depth="0"] > .sd-sidebar-item > .sd-sidebar-group > .sd-sidebar-summary > .sd-sidebar-chevron {
+  width: 1.25rem;
+  height: 1rem;
+}
+
+.sd-sidebar-chevron svg {
+  width: .7rem;
+  height: .7rem;
+  transition: transform .18s ease;
+}
+
+.sd-sidebar-summary:hover .sd-sidebar-chevron {
+  color: var(--sd-ink);
+  border-color: color-mix(in srgb, var(--sd-accent) 42%, var(--sd-line));
+  background: color-mix(in srgb, var(--sd-accent) 9%, var(--sd-panel));
+}
+
+.sd-sidebar-group[open] > .sd-sidebar-summary > .sd-sidebar-chevron {
+  transform: none;
+}
+
+.sd-sidebar-group[open] > .sd-sidebar-summary > .sd-sidebar-chevron svg {
+  transform: rotate(90deg);
+}
+
 .landing-shell {
   width: 100%;
   overflow: hidden;

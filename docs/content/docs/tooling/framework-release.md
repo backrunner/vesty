@@ -10,12 +10,12 @@ Vesty releases are tag-driven. A release tag publishes the framework SDK and CLI
 
 Complete the first crates.io and npm publications manually. Both registries require a package to exist before its owner can add a trusted publisher. After the packages exist, create two protected GitHub environments with no registry secrets:
 
-- `crates-io` protects the `publish-crates` job. For every Vesty crate, add a GitHub trusted publisher with repository owner `orchiliao`, repository name `vesty`, workflow filename `release.yml`, and environment `crates-io`.
-- `npm` protects the `publish-npm` job. For all four `@vesty/*` packages, add a GitHub Actions trusted publisher with repository owner `orchiliao`, repository name `vesty`, workflow filename `release.yml`, and environment `npm`.
+- `crates-io` protects the `publish-crates` job. For every Vesty crate, add a GitHub trusted publisher with repository owner `backrunner`, repository name `vesty`, workflow filename `release.yml`, and environment `crates-io`.
+- `npm` protects the `publish-npm` job. For all four `@vesty/*` packages, add a GitHub Actions trusted publisher with repository owner `backrunner`, repository name `vesty`, workflow filename `release.yml`, and environment `npm`.
 
 Require reviewer approval on both environments. The workflow requests GitHub OIDC identity tokens and exchanges them for short-lived registry credentials; it does not read a crates.io or npm publishing secret.
 
-The GitHub repository must exist at `orchiliao/vesty` before either registry publisher is configured. If the final repository owner changes, update the documentation and use that exact owner in all 17 publisher records.
+The GitHub repository must exist at `backrunner/vesty` before either registry publisher is configured. If the final repository owner changes, update the documentation and use that exact owner in all 17 publisher records.
 
 ## Prepare a version
 
@@ -75,6 +75,6 @@ For a prerelease installer test, pass its explicit tag:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://raw.githubusercontent.com/orchiliao/vesty/main/scripts/install.sh \
+  https://raw.githubusercontent.com/backrunner/vesty/main/scripts/install.sh \
   | VESTY_VERSION=v0.1.0-alpha.1 sh
 ```

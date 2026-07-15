@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$repository = if ($env:VESTY_REPOSITORY) { $env:VESTY_REPOSITORY } else { "orchiliao/vesty" }
+$repository = if ($env:VESTY_REPOSITORY) { $env:VESTY_REPOSITORY } else { "backrunner/vesty" }
 $version = if ($env:VESTY_VERSION) { $env:VESTY_VERSION } else { "latest" }
 $installDir = if ($env:VESTY_INSTALL_DIR) { $env:VESTY_INSTALL_DIR } else { Join-Path $HOME ".local\bin" }
 $architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture

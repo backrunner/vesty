@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-repository="${VESTY_REPOSITORY:-orchiliao/vesty}"
+repository="${VESTY_REPOSITORY:-backrunner/vesty}"
 version="${VESTY_VERSION:-latest}"
 install_dir="${VESTY_INSTALL_DIR:-${HOME}/.local/bin}"
 

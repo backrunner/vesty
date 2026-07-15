@@ -19,13 +19,13 @@ Install the prebuilt CLI from GitHub Releases. The installer selects the archive
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://raw.githubusercontent.com/orchiliao/vesty/main/scripts/install.sh | sh
+  https://raw.githubusercontent.com/backrunner/vesty/main/scripts/install.sh | sh
 ```
 
 On Windows PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/orchiliao/vesty/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/backrunner/vesty/main/scripts/install.ps1 | iex
 ```
 
 The installers use the latest stable GitHub Release. To install an alpha, beta, or other specific version, set `VESTY_VERSION` to the v-prefixed tag listed on the Releases page. You can also download an archive and `SHA256SUMS` manually from the same release.

@@ -1,21 +1,21 @@
 ---
 title: 快速开始
-description: 构建并验证第一个 Vesty 音频效果器。
+description: 使用 Rust 构建并验证你的第一个 Vesty 音频效果器。
 order: 1
 ---
 
-Vesty 将 DSP 保持在 Rust 中，同时允许编辑器使用常规 Web 框架。本指南会创建一个最小但可用的增益效果器。
+Vesty 使用 Rust 运行 DSP，同时允许编辑器采用常见的 Web 框架。本指南将带你创建一个规模最小但功能完整的增益效果器，并指出后续开发路径。
 
 ## 环境要求
 
 - Rust 1.95 或更新版本。
 - 用于手动测试的 VST3 宿主。
 - 只有使用 Web UI 时才需要 Node.js 24 或更新版本。
-- 编译 `wry` backend 时需要对应平台的 WebView 开发库。
+- 编译 `wry` 后端时，需要当前平台对应的 WebView 开发库。
 
 ## 添加 Vesty
 
-创建同时输出 `rlib` 和 `cdylib` 的 Rust library：
+创建一个同时输出 `rlib` 和 `cdylib` 的 Rust 库：
 
 ```toml title="Cargo.toml"
 [package]
@@ -30,7 +30,7 @@ crate-type = ["rlib", "cdylib"]
 vesty = "0.1.0"
 ```
 
-Vesty 目前仍处于 alpha。在本仓库中开发未发布 API 时，请使用 path dependency：
+Vesty 目前仍处于 alpha 阶段。在本仓库中使用尚未发布的 API 时，请采用路径依赖：
 
 ```toml
 vesty = { path = "../../crates/vesty" }
@@ -105,7 +105,7 @@ impl AudioKernel for GainKernel {
 vesty::export_vst3!(GainPlugin);
 ```
 
-## 验证 workspace
+## 验证工作区
 
 ```bash
 cargo fmt --all --check
@@ -113,11 +113,11 @@ cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-仓库中的 `examples/gain`、`examples/midi-synth` 和 `examples/web-ui-param-demo` 都是可运行的参考实现。
+仓库中的 `examples/gain`、`examples/midi-synth` 和 `examples/web-ui-param-demo` 都提供了可运行的参考实现。
 
 ## 下一步
 
 - 通过[架构](/docs/zh/concepts/architecture)理解原生层与 WebView 的关系。
-- 在实现 DSP 前阅读[实时安全](/docs/zh/concepts/realtime-safety)。
+- 在实现 DSP 前阅读[实时安全](/docs/zh/concepts/realtime-safety)规则。
 - 使用[参数指南](/docs/zh/guides/parameters)添加宿主可见参数。
 - 使用[Web UI 指南](/docs/zh/guides/web-ui)构建编辑器。

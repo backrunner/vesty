@@ -1,6 +1,6 @@
 ---
 title: CLI 工作流
-description: 使用 vesty 命令执行可重复的工程操作。
+description: 使用 vesty 命令重复执行脚手架、构建、生成和诊断流程。
 order: 1
 ---
 
@@ -20,7 +20,7 @@ vesty new my-plugin --template web-ui-react
 vesty templates
 ```
 
-模板包括原生 gain、instrument 以及 vanilla、React、Vue、Svelte Web UI starter。生成的 UI 从当前 `ready.paramValues` 初始化，并订阅确认后的参数变化。
+模板包括原生增益效果器、乐器，以及原生 JavaScript、React、Vue 和 Svelte Web UI 起始工程。生成的 UI 会从当前 `ready.paramValues` 初始化，并订阅宿主确认后的参数变化。
 
 ## 开发与构建
 
@@ -29,9 +29,9 @@ vesty dev --config vesty.toml
 vesty build --config vesty.toml
 ```
 
-同时保留普通 Rust 和 npm 检查。CLI 不会替代编译器、linter 和单元测试结果。
+仍然需要运行常规的 Rust 与 npm 检查。CLI 不会替代编译器、代码检查器或单元测试提供的反馈。
 
-## 协议与 manifest
+## 协议与参数清单
 
 ```bash
 vesty export-types --out target/vesty-protocol
@@ -43,7 +43,7 @@ vesty param-manifest \
   --check
 ```
 
-CI 中使用 `--check` 捕获生成文件漂移。
+在 CI 中使用 `--check`，可以在生成文件与源码定义不一致时让检查失败。
 
 ## 诊断
 
@@ -52,5 +52,4 @@ vesty doctor --format json
 vesty smoke-host --out target/smoke-host.json
 ```
 
-`smoke-host` 检查仓库配置、sidecar 和可选 bridge/meter trace。它是 headless self-check，不是 DAW 或 validator 运行。
-
+`smoke-host` 检查仓库配置、附属文件，以及可选的 Bridge 和电平跟踪记录。它是一项无界面的自检，不等同于真实 DAW 测试或 Steinberg validator 运行。

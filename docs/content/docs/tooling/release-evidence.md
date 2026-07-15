@@ -11,7 +11,7 @@ Vesty's release gate is intentionally strict. A successful unit test cannot prov
 - Workspace tests and clippy.
 - Generated protocol and parameter manifest drift checks.
 - Crate publish order and package readiness.
-- npm pack boundaries and dependency latest baseline.
+- npm package boundaries and the baseline for current dependency versions.
 - Platform-local strict static bundle validation.
 
 ## External evidence
@@ -19,7 +19,7 @@ Vesty's release gate is intentionally strict. A successful unit test cannot prov
 - Scan, load, UI, automation, save/restore, and offline render in supported DAWs.
 - macOS, Windows x64, and Linux X11 system WebView smoke reports.
 - Steinberg validator reports for every example and platform.
-- GitHub Actions run URL and per-OS artifacts.
+- A GitHub Actions run URL and artifacts for each operating system.
 - macOS/Windows signing verification.
 - Apple notarytool acceptance and stapler success.
 
@@ -39,4 +39,3 @@ A failed report is useful: the generated action plan names the missing evidence 
 ## Current project status
 
 Vesty is alpha. Local implementation gates pass, while real DAW, cross-platform WebView, complete validator matrix, signing, and notarization evidence remain release requirements.
-

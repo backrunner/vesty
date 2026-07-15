@@ -1,6 +1,6 @@
 ---
 title: JSBridge protocol
-description: Reference the editor handshake, commands, events, and error model.
+description: Look up the editor handshake, commands, events, state, and error model.
 order: 2
 ---
 
@@ -44,4 +44,3 @@ Reliable topics require an explicit subscription. Snapshot/config/UI commands us
 Important codes include `validation_error`, `unsupported_version`, `unsupported_type`, `timeout`, `backpressure`, `host_rejected`, `plugin_faulted`, `state_conflict`, and `internal_error`.
 
 Errors are data, not thrown native panics. The JavaScript SDK turns an error packet into a rejected Promise with `code`, `message`, `retryable`, and optional bounded details.
-

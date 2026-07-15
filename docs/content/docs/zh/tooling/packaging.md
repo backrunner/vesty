@@ -1,10 +1,10 @@
 ---
 title: 打包与验证
-description: 构建平台 VST3 bundle，并检查静态契约。
+description: 为目标平台构建 VST3 插件包，并检查其中的静态契约。
 order: 2
 ---
 
-## 配置 package
+## 配置插件包
 
 ```toml title="vesty.toml"
 [plugin]
@@ -20,7 +20,7 @@ category = "Fx"
 parameter_manifest = "vesty-parameters.json"
 ```
 
-Class ID、bundle ID 和参数 ID 都是持久兼容性契约。
+Class ID、Bundle ID 和参数 ID 都是需要长期保持稳定的兼容性契约。
 
 ## 在 macOS 构建和打包
 
@@ -34,9 +34,9 @@ vesty package \
   --out target/package
 ```
 
-平台值还包括 `windows-x64` 和 `linux-x64`，分别使用匹配的 `.dll` 或 `.so`。
+可用的平台值还包括 `windows-x64` 和 `linux-x64`；请分别传入对应的 `.dll` 或 `.so` 文件。
 
-## 运行 strict static validation
+## 运行严格静态验证
 
 ```bash
 vesty validate target/package/MyGain.vst3 \
@@ -46,7 +46,7 @@ vesty validate target/package/MyGain.vst3 \
   --report target/package/MyGain.validate.json
 ```
 
-静态验证检查 bundle 结构、元数据一致性、binary export、参数 manifest 和 Web UI asset hash。Strict 模式要求平台导出检查工具提供正向证据。
+静态验证会检查插件包结构、元数据一致性、二进制导出符号、参数清单和 Web UI 资源哈希。在严格模式下，平台导出检查工具必须提供明确的通过证据，否则验证会失败。
 
 ## 运行 Steinberg validator
 
@@ -58,5 +58,4 @@ vesty validate target/package/MyGain.vst3 \
   --validator-log target/validator/MyGain.log
 ```
 
-每个支持的发布平台都要保存 validator 和 static report。
-
+应为每个受支持的发布平台保存 validator 报告和静态验证报告。

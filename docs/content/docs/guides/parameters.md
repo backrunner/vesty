@@ -1,6 +1,6 @@
 ---
 title: Parameters
-description: Declare typed parameters, stable IDs, flags, and host automation.
+description: Declare typed parameters, stable IDs, metadata, and host automation.
 order: 1
 ---
 
@@ -68,4 +68,3 @@ cargo run -p vesty-cli -- param-manifest \
 ```
 
 Commit the manifest. Packaging copies it into the VST3 bundle, and strict validation checks that it still matches the parameter specifications.
-

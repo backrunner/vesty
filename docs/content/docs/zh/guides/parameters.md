@@ -1,12 +1,12 @@
 ---
 title: 参数
-description: 声明类型化参数、稳定 ID、flag 和宿主自动化。
+description: 声明强类型参数、稳定 ID、参数标记和宿主自动化。
 order: 1
 ---
 
 ## 声明参数集合
 
-`#[derive(Params)]` 生成基于索引的 handle 访问，音频处理时无需搜索字符串。
+`#[derive(Params)]` 会生成基于索引的参数句柄访问方式，因此音频处理期间不需要按字符串搜索参数。
 
 ```rust
 #[derive(Params)]
@@ -30,7 +30,7 @@ impl Default for FilterParams {
 
 字符串 ID 是持久的工程契约。发布后不要随意改名，除非同时提供迁移策略。
 
-## 只解析一次 handle
+## 只解析一次参数句柄
 
 ```rust
 fn create_kernel(&self, _init: KernelInit) -> FilterKernel {
@@ -41,15 +41,15 @@ fn create_kernel(&self, _init: KernelInit) -> FilterKernel {
 }
 ```
 
-无效 handle 会安全返回 `None`，不会从宿主初始化流程 panic。
+无效句柄会安全地返回 `None`，不会让 `panic` 穿出宿主初始化流程。
 
-## Sample-accurate 自动化
+## 采样级精确自动化
 
-需要精确 offset 时，消费 `ProcessContext` 中的参数事件。适配层会保留首个事件之前的上一 block 值，按 sample offset 排序，并在处理完成后提交最终值。
+算法需要精确采样位置时，应读取 `ProcessContext` 中的参数事件。适配层会在第一个事件之前保留上一音频块的值，按采样偏移排列事件，并在整块处理完成后提交最终值。
 
-对于更新频率更低的系数，将事件处理与预分配 smoother 结合，避免每个 sample 重算昂贵状态。
+对于不必逐采样更新的系数，可以把事件处理与预分配的平滑器结合起来，避免每个采样点都重新计算昂贵状态。
 
-## 生成 manifest
+## 生成参数清单
 
 ```bash
 cargo run -p vesty-cli -- param-manifest \
@@ -62,5 +62,4 @@ cargo run -p vesty-cli -- param-manifest \
   --check
 ```
 
-Manifest 应纳入 Git。打包时会复制到 VST3 bundle，strict validation 会验证它仍与参数规格一致。
-
+参数清单应纳入 Git。打包时，Vesty 会把它复制到 VST3 插件包；严格验证还会确认清单与参数规格保持一致。

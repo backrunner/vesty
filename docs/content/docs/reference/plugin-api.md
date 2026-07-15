@@ -1,6 +1,6 @@
 ---
 title: Plugin API
-description: A compact reference for the Rust authoring surface.
+description: Look up the core Rust interfaces used to author a Vesty plugin.
 order: 1
 ---
 
@@ -58,4 +58,3 @@ vesty::export_vst3!(MyPlugin);
 ```
 
 The macro exports the platform factory and module entry points with panic guards. A plugin type must implement `Default` because the host factory creates instances without application-owned constructor arguments.
-

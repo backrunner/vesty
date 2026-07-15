@@ -1,10 +1,10 @@
 ---
 title: Get started
-description: Build and test your first Vesty audio effect.
+description: Build, test, and validate your first Vesty audio effect.
 order: 1
 ---
 
-Vesty keeps DSP in Rust while allowing the editor to use ordinary web frameworks. This guide creates the smallest useful audio effect and explains where to go next.
+Vesty keeps DSP in Rust while letting you build the editor with familiar web frameworks. This guide creates the smallest useful audio effect, verifies it, and points you to the next stage of development.
 
 ## Requirements
 
@@ -121,4 +121,3 @@ The repository includes working examples under `examples/gain`, `examples/midi-s
 - Read the non-negotiable [Realtime safety](/docs/concepts/realtime-safety) rules.
 - Add a parameter with the [Parameters guide](/docs/guides/parameters).
 - Build an editor with the [Web UI guide](/docs/guides/web-ui).
-

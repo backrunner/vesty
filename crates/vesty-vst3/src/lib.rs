@@ -1151,10 +1151,16 @@ mod tests {
 
             unsafe fn seek(&self, pos: int64, mode: int32, result: *mut int64) -> tresult {
                 let len = self.bytes.borrow().len() as int64;
-                let base = match mode as u32 {
-                    IBStream_::IStreamSeekMode_::kIBSeekSet => 0,
-                    IBStream_::IStreamSeekMode_::kIBSeekCur => self.cursor.get() as int64,
-                    IBStream_::IStreamSeekMode_::kIBSeekEnd => len,
+                #[allow(clippy::unnecessary_cast)]
+                let seek_set = IBStream_::IStreamSeekMode_::kIBSeekSet as int32;
+                #[allow(clippy::unnecessary_cast)]
+                let seek_current = IBStream_::IStreamSeekMode_::kIBSeekCur as int32;
+                #[allow(clippy::unnecessary_cast)]
+                let seek_end = IBStream_::IStreamSeekMode_::kIBSeekEnd as int32;
+                let base = match mode {
+                    value if value == seek_set => 0,
+                    value if value == seek_current => self.cursor.get() as int64,
+                    value if value == seek_end => len,
                     _ => return kInvalidArgument,
                 };
                 let Some(next) = base.checked_add(pos) else {
@@ -3595,10 +3601,8 @@ mod tests {
                 let main_info = main_info.assume_init();
                 assert_eq!(main_info.channelCount, 2);
                 assert_eq!(main_info.busType, BusTypes_::kMain as BusType);
-                assert_eq!(
-                    main_info.flags & BusInfo_::BusFlags_::kDefaultActive,
-                    BusInfo_::BusFlags_::kDefaultActive
-                );
+                let default_active = crate::bindings_impl::DEFAULT_ACTIVE_BUS_FLAG;
+                assert_eq!(main_info.flags & default_active, default_active);
 
                 let mut sidechain_info = MaybeUninit::<BusInfo>::zeroed();
                 assert_eq!(
@@ -3613,10 +3617,7 @@ mod tests {
                 let sidechain_info = sidechain_info.assume_init();
                 assert_eq!(sidechain_info.channelCount, 2);
                 assert_eq!(sidechain_info.busType, BusTypes_::kAux as BusType);
-                assert_eq!(
-                    sidechain_info.flags & BusInfo_::BusFlags_::kDefaultActive,
-                    0
-                );
+                assert_eq!(sidechain_info.flags & default_active, 0);
                 let mut invalid_info = MaybeUninit::<BusInfo>::zeroed();
                 assert_eq!(
                     component.getBusInfo(
@@ -4099,10 +4100,8 @@ mod tests {
                 let main_info = main_info.assume_init();
                 assert_eq!(main_info.channelCount, 2);
                 assert_eq!(main_info.busType, BusTypes_::kMain as BusType);
-                assert_eq!(
-                    main_info.flags & BusInfo_::BusFlags_::kDefaultActive,
-                    BusInfo_::BusFlags_::kDefaultActive
-                );
+                let default_active = crate::bindings_impl::DEFAULT_ACTIVE_BUS_FLAG;
+                assert_eq!(main_info.flags & default_active, default_active);
                 assert_eq!(string128_to_string(&main_info.name), "Main");
 
                 let mut aux_info = MaybeUninit::<BusInfo>::zeroed();
@@ -4118,7 +4117,7 @@ mod tests {
                 let aux_info = aux_info.assume_init();
                 assert_eq!(aux_info.channelCount, 2);
                 assert_eq!(aux_info.busType, BusTypes_::kAux as BusType);
-                assert_eq!(aux_info.flags & BusInfo_::BusFlags_::kDefaultActive, 0);
+                assert_eq!(aux_info.flags & default_active, 0);
                 assert_eq!(string128_to_string(&aux_info.name), "Aux 1");
 
                 let mut invalid_info = MaybeUninit::<BusInfo>::zeroed();
@@ -5162,8 +5161,8 @@ mod tests {
 
                 let mut context =
                     MaybeUninit::<vst3::Steinberg::Vst::ProcessContext>::zeroed().assume_init();
-                context.state = ProcessContext_::StatesAndFlags_::kPlaying
-                    | ProcessContext_::StatesAndFlags_::kTempoValid;
+                context.state = crate::bindings_impl::PROCESS_CONTEXT_PLAYING_FLAG
+                    | crate::bindings_impl::PROCESS_CONTEXT_TEMPO_VALID_FLAG;
                 context.tempo = 132.5;
                 context.projectTimeSamples = 2048;
 

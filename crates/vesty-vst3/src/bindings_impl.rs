@@ -73,6 +73,18 @@ const TELEMETRY_BIND_MESSAGE_ID: &[u8] = b"vesty.telemetry.bind\0";
 const TELEMETRY_ID_ATTR: &[u8] = b"telemetryId\0";
 const ROOT_UNIT_INDEX: int32 = 0;
 const ROOT_UNIT_PROGRAM_LIST_INDEX: usize = 0;
+#[allow(clippy::unnecessary_cast)]
+const LEGACY_PITCH_BEND_CONTROL: u32 = ControllerNumbers_::kPitchBend as u32;
+#[allow(clippy::unnecessary_cast)]
+const LEGACY_AFTERTOUCH_CONTROL: u32 = ControllerNumbers_::kAfterTouch as u32;
+#[allow(clippy::unnecessary_cast)]
+pub(crate) const PROCESS_CONTEXT_PLAYING_FLAG: u32 =
+    ProcessContext_::StatesAndFlags_::kPlaying as u32;
+#[allow(clippy::unnecessary_cast)]
+pub(crate) const PROCESS_CONTEXT_TEMPO_VALID_FLAG: u32 =
+    ProcessContext_::StatesAndFlags_::kTempoValid as u32;
+#[allow(clippy::unnecessary_cast)]
+pub(crate) const DEFAULT_ACTIVE_BUS_FLAG: u32 = BusInfo_::BusFlags_::kDefaultActive as u32;
 #[cfg(feature = "wry-ui")]
 static NEXT_EDITOR_SESSION_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -2012,14 +2024,14 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                         let value = clamp_midi7_i8(midi.value);
                         let value2 = clamp_midi7_i8(midi.value2);
                         match u32::from(midi.controlNumber) {
-                            control if control == ControllerNumbers_::kPitchBend => {
+                            LEGACY_PITCH_BEND_CONTROL => {
                                 let _ = events.push(VestyEvent::PitchBend {
                                     sample_offset,
                                     channel,
                                     value: midi_pitch_bend_to_bipolar(value, value2),
                                 });
                             }
-                            control if control == ControllerNumbers_::kAfterTouch => {
+                            LEGACY_AFTERTOUCH_CONTROL => {
                                 let _ = events.push(VestyEvent::ChannelPressure {
                                     sample_offset,
                                     channel,
@@ -2051,8 +2063,8 @@ impl<P: Plugin + Default> VestyProcessor<P> {
 
             let context = &*process_data.processContext;
             Transport {
-                playing: context.state & ProcessContext_::StatesAndFlags_::kPlaying != 0,
-                tempo_bpm: (context.state & ProcessContext_::StatesAndFlags_::kTempoValid != 0)
+                playing: context.state & PROCESS_CONTEXT_PLAYING_FLAG != 0,
+                tempo_bpm: (context.state & PROCESS_CONTEXT_TEMPO_VALID_FLAG != 0)
                     .then_some(context.tempo),
                 position_samples: Some(context.projectTimeSamples),
             }
@@ -2464,7 +2476,7 @@ impl<P: Plugin + Default> IComponentTrait for VestyProcessor<P> {
                             .unwrap_or(2);
                     copy_wstring("Input", &mut bus.name);
                     bus.busType = BusTypes_::kMain as BusType;
-                    bus.flags = BusInfo_::BusFlags_::kDefaultActive;
+                    bus.flags = DEFAULT_ACTIVE_BUS_FLAG;
                     kResultOk
                 }
                 (MediaTypes_::kAudio, BusDirections_::kInput)
@@ -2503,7 +2515,7 @@ impl<P: Plugin + Default> IComponentTrait for VestyProcessor<P> {
                         BusTypes_::kAux
                     } as BusType;
                     bus.flags = if index == 0 {
-                        BusInfo_::BusFlags_::kDefaultActive
+                        DEFAULT_ACTIVE_BUS_FLAG
                     } else {
                         0
                     };
@@ -2517,7 +2529,7 @@ impl<P: Plugin + Default> IComponentTrait for VestyProcessor<P> {
                     bus.channelCount = 1;
                     copy_wstring("Event Input", &mut bus.name);
                     bus.busType = BusTypes_::kMain as BusType;
-                    bus.flags = BusInfo_::BusFlags_::kDefaultActive;
+                    bus.flags = DEFAULT_ACTIVE_BUS_FLAG;
                     kResultOk
                 }
                 _ => kInvalidArgument,

@@ -24488,10 +24488,10 @@ Result: 47 tests passed, 0 tests failed
         for expected in [
             "authors = [\"Vesty Contributors\"]",
             "categories = [",
-            "homepage = \"https://github.com/orchiliao/vesty\"",
+            "homepage = \"https://github.com/backrunner/vesty\"",
             "keywords = [",
             "license = \"Apache-2.0\"",
-            "repository = \"https://github.com/orchiliao/vesty\"",
+            "repository = \"https://github.com/backrunner/vesty\"",
         ] {
             assert!(
                 root_manifest.contains(expected),
@@ -24559,7 +24559,7 @@ Result: 47 tests passed, 0 tests failed
             );
             let source = fs::read_to_string(example_dir.join("src/lib.rs")).unwrap();
             assert!(
-                source.contains("url: \"https://github.com/orchiliao/vesty\""),
+                source.contains("url: \"https://github.com/backrunner/vesty\""),
                 "{example_dir}/src/lib.rs should use the project URL"
             );
             assert!(
@@ -24576,7 +24576,7 @@ Result: 47 tests passed, 0 tests failed
                 "\"description\":",
                 "\"license\": \"Apache-2.0\"",
                 "\"repository\":",
-                "\"homepage\": \"https://github.com/orchiliao/vesty#readme\"",
+                "\"homepage\": \"https://github.com/backrunner/vesty#readme\"",
                 "\"keywords\": [",
                 "\"exports\":",
                 "\"files\": [",

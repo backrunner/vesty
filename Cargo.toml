@@ -23,10 +23,10 @@ resolver = "2"
 authors = ["Vesty Contributors"]
 categories = ["multimedia::audio", "api-bindings", "development-tools"]
 edition = "2024"
-homepage = "https://github.com/orchiliao/vesty"
+homepage = "https://github.com/backrunner/vesty"
 keywords = ["vst3", "audio", "plugin", "webview", "dsp"]
 license = "Apache-2.0"
-repository = "https://github.com/orchiliao/vesty"
+repository = "https://github.com/backrunner/vesty"
 rust-version = "1.95"
 version = "0.1.0"
 

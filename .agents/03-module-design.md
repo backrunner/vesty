@@ -182,7 +182,7 @@ impl Plugin for GainPlugin {
     const INFO: PluginInfo = PluginInfo {
         name: "Vesty Gain",
         vendor: "Vesty",
-        url: "https://github.com/orchiliao/vesty",
+        url: "https://github.com/backrunner/vesty",
         email: "",
         version: "0.1.0",
         class_id: *b"0123456789ABCDEF",

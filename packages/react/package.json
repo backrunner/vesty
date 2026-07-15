@@ -9,10 +9,10 @@
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/orchiliao/vesty.git",
+    "url": "git+https://github.com/backrunner/vesty.git",
     "directory": "packages/react"
   },
-  "homepage": "https://github.com/orchiliao/vesty#readme",
+  "homepage": "https://github.com/backrunner/vesty#readme",
   "keywords": [
     "vst3",
     "audio-plugin",

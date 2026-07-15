@@ -30,7 +30,7 @@ Install the prebuilt CLI from the latest GitHub Release:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://raw.githubusercontent.com/orchiliao/vesty/main/scripts/install.sh | sh
+  https://raw.githubusercontent.com/backrunner/vesty/main/scripts/install.sh | sh
 vesty --version
 vesty doctor
 ```
@@ -44,7 +44,7 @@ cd my-plugin
 cargo test
 ```
 
-Windows users can run `irm https://raw.githubusercontent.com/orchiliao/vesty/main/scripts/install.ps1 | iex` in PowerShell. Source checkout instructions remain available for contributors and unreleased development.
+Windows users can run `irm https://raw.githubusercontent.com/backrunner/vesty/main/scripts/install.ps1 | iex` in PowerShell. Source checkout instructions remain available for contributors and unreleased development.
 
 The complete English and Simplified Chinese guides live in [`docs/`](docs/). Start with the [complete plugin tutorial](docs/content/docs/guides/complete-plugin.md) for the path from scaffold to validated VST3 bundle.
 
@@ -81,7 +81,7 @@ impl Plugin for MyPlugin {
     const INFO: PluginInfo = PluginInfo {
         name: "My Plugin",
         vendor: "My Company",
-        url: "https://github.com/orchiliao/vesty",
+        url: "https://github.com/backrunner/vesty",
         email: "",
         version: "0.1.0",
         class_id: *b"VESTYEXAMPLE0001",

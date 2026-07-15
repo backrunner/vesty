@@ -39,13 +39,13 @@ export default defineConfig({
       { label: 'Reference', labelKey: 'nav.reference', href: '/docs/reference' }
     ],
     social: [
-      { label: 'GitHub', href: 'https://github.com/orchiliao/vesty', external: true }
+      { label: 'GitHub', href: 'https://github.com/backrunner/vesty', external: true }
     ],
     footer: {
       text: 'Rust in the audio thread. Web tools in the editor.',
       links: [
-        { label: 'Apache-2.0', href: 'https://github.com/orchiliao/vesty/blob/main/LICENSE-APACHE', external: true },
-        { label: 'GitHub', href: 'https://github.com/orchiliao/vesty', external: true }
+        { label: 'Apache-2.0', href: 'https://github.com/backrunner/vesty/blob/main/LICENSE-APACHE', external: true },
+        { label: 'GitHub', href: 'https://github.com/backrunner/vesty', external: true }
       ]
     },
     home: {
@@ -265,7 +265,7 @@ export default defineConfig({
     }
   },
   source: {
-    editBaseUrl: 'https://github.com/orchiliao/vesty/edit/main/docs'
+    editBaseUrl: 'https://github.com/backrunner/vesty/edit/main/docs'
   },
   checks: {
     assets: true,

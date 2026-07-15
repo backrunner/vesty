@@ -145,13 +145,14 @@ jobs:
 
       - name: Typecheck exported TypeScript
         run: |
+          mapfile -t protocol_files < <(find target/vesty-protocol-ci/typescript -name '*.ts' -print | sort)
           npx -y -p typescript@latest tsc \
             --strict \
             --noEmit \
             --target ES2022 \
             --module ESNext \
             --moduleResolution Bundler \
-            $(find target/vesty-protocol-ci/typescript -name '*.ts' | sort)
+            "${protocol_files[@]}"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -213,7 +214,21 @@ jobs:
           bash -n scripts/install.sh
           bash -n scripts/release/publish-crates.sh
           bash -n scripts/release/publish-npm.sh
-          pwsh -NoProfile -Command '$errors = $null; [System.Management.Automation.Language.Parser]::ParseFile("scripts/install.ps1", [ref]$null, [ref]$errors) > $null; if ($errors.Count) { $errors | Out-String | Write-Error; exit 1 }'
+
+      - name: Check PowerShell installer syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "scripts/install.ps1",
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count) {
+            $errors | Out-String | Write-Error
+            exit 1
+          }
 
       - name: Check workflow files
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml

@@ -14,15 +14,15 @@ export default defineConfig({
   theme: {
     defaultMode: 'dark',
     palette: {
-      accent: '#62e6a7',
-      neutral: 'zinc'
+      accent: '#e47a5f',
+      neutral: 'stone'
     },
     fonts: {
-      sans: '"Avenir Next", Avenir, "Segoe UI", sans-serif',
-      display: '"DIN Alternate", "Avenir Next Condensed", "Avenir Next", sans-serif',
-      mono: '"IBM Plex Mono", Menlo, Monaco, monospace'
+      sans: '"Avenir Next", Avenir, "Helvetica Neue", sans-serif',
+      display: 'Baskerville, "Iowan Old Style", Georgia, serif',
+      mono: '"American Typewriter", "Courier New", monospace'
     },
-    radius: '2px',
+    radius: '4px',
     codeTheme: {
       light: 'github-light',
       dark: 'vesper'

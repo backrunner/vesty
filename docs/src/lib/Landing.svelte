@@ -62,7 +62,7 @@
     const render = () => {
       ctx.clearRect(0, 0, width, height);
       ctx.globalAlpha = 0.22;
-      ctx.strokeStyle = '#53615b';
+      ctx.strokeStyle = '#7a6f5a';
       ctx.lineWidth = 1;
       for (let y = 32; y < height; y += 48) {
         ctx.beginPath();
@@ -71,9 +71,9 @@
         ctx.stroke();
       }
       ctx.globalAlpha = 0.8;
-      drawWave(height * 0.43, 36, 0.026, '#62e6a7', 0);
+      drawWave(height * 0.43, 36, 0.026, '#d5ad57', 0);
       ctx.globalAlpha = 0.58;
-      drawWave(height * 0.61, 24, 0.041, '#ff8a5b', 1.7);
+      drawWave(height * 0.61, 24, 0.041, '#d96049', 1.7);
       ctx.globalAlpha = 1;
       frame += 1;
       if (!reduceMotion) animation = requestAnimationFrame(render);

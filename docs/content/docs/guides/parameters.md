@@ -57,11 +57,11 @@ For a coefficient that can change less frequently, combine event handling with a
 ## Generate the manifest
 
 ```bash
-cargo run -p vesty-cli -- param-manifest \
+vesty param-manifest \
   --specs params.specs.json \
   --out vesty-parameters.json
 
-cargo run -p vesty-cli -- param-manifest \
+vesty param-manifest \
   --specs params.specs.json \
   --out vesty-parameters.json \
   --check

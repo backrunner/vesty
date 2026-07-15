@@ -7,9 +7,9 @@ order: 1
 ## Discover commands
 
 ```bash
-cargo run -p vesty-cli -- --help
-cargo run -p vesty-cli -- package --help
-cargo run -p vesty-cli -- release-check --help
+vesty --help
+vesty package --help
+vesty release-check --help
 ```
 
 ## Create a project
@@ -53,4 +53,3 @@ vesty smoke-host --out target/smoke-host.json
 ```
 
 `smoke-host` checks repository configuration, sidecars, and optional bridge/meter traces. It is a headless self-check, not a DAW or validator run.
-

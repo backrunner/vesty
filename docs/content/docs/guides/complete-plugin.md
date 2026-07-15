@@ -12,27 +12,22 @@ At the end, you will have a loadable `.vst3` bundle. A bundle that passes local 
 
 You need Rust 1.95 or newer. Node.js 24 or newer is required only for a Web UI. You also need the platform WebView development libraries when enabling the `wry` backend and a VST3 host for the final smoke test.
 
-While Vesty is alpha, the most reliable workflow is to develop from a Vesty checkout:
+Install the prebuilt CLI as described in [Get started](/docs/quick-start), then verify the executable and local environment:
 
 ```bash
-git clone https://github.com/orchiliao/vesty.git
-cd vesty
-cargo build -p vesty-cli
-cargo run -p vesty-cli -- doctor
-cd ..
+vesty --version
+vesty doctor
 ```
 
-Inside the Vesty checkout, run commands as `cargo run -p vesty-cli -- <command>`. From the generated sibling project, use `cargo run --manifest-path ../vesty/Cargo.toml -p vesty-cli -- <command>`. If the CLI is already installed, use `vesty <command>` directly.
+The CLI embeds its maintained project templates and pins generated Rust and npm dependencies to the matching Vesty release. A source checkout is only required when contributing to Vesty itself or testing an unreleased framework revision.
 
 ## 2. Scaffold the effect
 
 List the maintained starters, then create the headless gain template:
 
 ```bash
-./vesty/target/debug/vesty templates
-./vesty/target/debug/vesty new signal-gain \
-  --template gain \
-  --vesty-path "$PWD/vesty/crates/vesty"
+vesty templates
+vesty new signal-gain --template gain
 cd signal-gain
 ```
 
@@ -53,10 +48,10 @@ signal-gain/
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-vesty = { path = "../vesty/crates/vesty" }
+vesty = "=0.1.0"
 ```
 
-Adjust the relative path for where you created the project. Once Vesty is published for your intended release, pin an exact compatible crate version instead of a moving Git branch.
+The generated dependency version matches `vesty --version`. Keep this exact pin unless you intentionally upgrade the CLI and framework together.
 
 ## 3. Establish permanent identities
 
@@ -165,8 +160,7 @@ Keep `params.specs.json` synchronized with those declarations:
 Generate and commit the bundle manifest:
 
 ```bash
-cargo run --manifest-path ../vesty/Cargo.toml -p vesty-cli -- \
-  param-manifest --specs params.specs.json --out vesty-parameters.json
+vesty param-manifest --specs params.specs.json --out vesty-parameters.json
 ```
 
 After any intentional specification change, regenerate it. In CI, add `--check` so drift fails rather than silently rewriting the file.
@@ -318,10 +312,7 @@ You can start with a UI template instead:
 
 ```bash
 cd ..
-./vesty/target/debug/vesty new signal-gain-ui \
-  --template web-ui-param-demo \
-  --vesty-path "$PWD/vesty/crates/vesty" \
-  --plugin-ui-path "$PWD/vesty/packages/plugin-ui"
+vesty new signal-gain-ui --template web-ui-param-demo
 cd signal-gain-ui
 ```
 
@@ -347,8 +338,7 @@ During development, run the UI server and plugin watcher in separate terminals:
 npm install --prefix ui
 npm run dev --prefix ui
 
-cargo run --manifest-path ../vesty/Cargo.toml -p vesty-cli -- \
-  dev --config vesty.toml
+vesty dev --config vesty.toml
 ```
 
 Nothing in the Web UI path may be called from `process()`; JSON and WebView work stay on the controller/UI side of the boundary.
@@ -365,7 +355,7 @@ Package it with the platform-specific binary name:
 
 ```bash
 # macOS
-cargo run --manifest-path ../vesty/Cargo.toml -p vesty-cli -- package \
+vesty package \
   --config vesty.toml \
   --platform macos \
   --binary target/release/libsignal_gain.dylib \
@@ -382,7 +372,7 @@ If the project contains a UI, packaging runs its configured build command and co
 First run strict static validation:
 
 ```bash
-cargo run --manifest-path ../vesty/Cargo.toml -p vesty-cli -- validate \
+vesty validate \
   target/vesty/SignalGain.vst3 \
   --static-only \
   --strict \
@@ -393,7 +383,7 @@ cargo run --manifest-path ../vesty/Cargo.toml -p vesty-cli -- validate \
 This checks the bundle layout, exported symbols, metadata agreement, parameter manifest, and UI asset hashes. Then run Steinberg's validator and keep both its report and raw log:
 
 ```bash
-cargo run --manifest-path ../vesty/Cargo.toml -p vesty-cli -- validate \
+vesty validate \
   target/vesty/SignalGain.vst3 \
   --strict \
   --validator /absolute/path/to/validator \

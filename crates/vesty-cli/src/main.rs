@@ -20988,6 +20988,11 @@ fn ui_package_json(template: UiTemplate, package_paths: &UiPackagePaths) -> Stri
         UiTemplate::Svelte => "svelte-check --tsconfig ./tsconfig.json",
         UiTemplate::None | UiTemplate::Vanilla | UiTemplate::React => "tsc --noEmit",
     };
+    let typescript_dependency = match template {
+        // Current Vue and Svelte checkers rely on TypeScript compiler internals changed in 7.x.
+        UiTemplate::Vue | UiTemplate::Svelte => "6.0.3",
+        UiTemplate::None | UiTemplate::Vanilla | UiTemplate::React => "latest",
+    };
     let framework_dependencies = match template {
         UiTemplate::None | UiTemplate::Vanilla => String::new(),
         UiTemplate::React => format!(
@@ -21021,12 +21026,12 @@ fn ui_package_json(template: UiTemplate, package_paths: &UiPackagePaths) -> Stri
         UiTemplate::Vue => {
             r#",
     "@vitejs/plugin-vue": "latest",
-    "vue-tsc": "latest""#
+    "vue-tsc": "3.3.7""#
         }
         UiTemplate::Svelte => {
             r#",
     "@sveltejs/vite-plugin-svelte": "latest",
-    "svelte-check": "latest""#
+    "svelte-check": "4.7.2""#
         }
     };
     r#"{
@@ -21043,12 +21048,13 @@ fn ui_package_json(template: UiTemplate, package_paths: &UiPackagePaths) -> Stri
     "@vesty/plugin-ui": __PLUGIN_UI_DEPENDENCY____FRAMEWORK_DEPENDENCIES__
   },
   "devDependencies": {
-    "typescript": "latest",
+    "typescript": "__TYPESCRIPT_DEPENDENCY__",
     "vite": "latest"__FRAMEWORK_DEV_DEPENDENCIES__
   }
 }
 "#
     .replace("__TYPECHECK_SCRIPT__", typecheck_script)
+    .replace("__TYPESCRIPT_DEPENDENCY__", typescript_dependency)
     .replace(
         "__PLUGIN_UI_DEPENDENCY__",
         &json_string_literal(&plugin_ui_dependency),
@@ -37718,7 +37724,8 @@ bridge timeout
                     assert!(package_json.contains("\"vue\""));
                     assert!(package_json.contains("\"@vitejs/plugin-vue\""));
                     assert_eq!(package["scripts"]["typecheck"], "vue-tsc --noEmit");
-                    assert_eq!(package["devDependencies"]["vue-tsc"], "latest");
+                    assert_eq!(package["devDependencies"]["vue-tsc"], "3.3.7");
+                    assert_eq!(package["devDependencies"]["typescript"], "6.0.3");
                     assert!(index_html.contains("/src/main.ts"));
                     assert!(vite_config.contains("vue()"));
                     assert!(app.contains("@vesty/vue"));
@@ -37742,7 +37749,8 @@ bridge timeout
                         package["scripts"]["typecheck"],
                         "svelte-check --tsconfig ./tsconfig.json"
                     );
-                    assert_eq!(package["devDependencies"]["svelte-check"], "latest");
+                    assert_eq!(package["devDependencies"]["svelte-check"], "4.7.2");
+                    assert_eq!(package["devDependencies"]["typescript"], "6.0.3");
                     assert!(index_html.contains("/src/main.ts"));
                     assert!(vite_config.contains("svelte()"));
                     assert!(app.contains("@vesty/svelte"));

@@ -117,7 +117,7 @@
       <h1 id="vesty-title">{page.title}</h1>
       <p class="hero-description">{context.t('landing.description')}</p>
       <div class="hero-actions">
-        <a class="action-primary" href={resolveLocalizedHref('/docs', context)}>{context.t('landing.docs')} <span aria-hidden="true">→</span></a>
+        <a class="action-primary" href={resolveLocalizedHref('/docs/quick-start', context)}>{context.t('landing.docs')} <span aria-hidden="true">→</span></a>
         <a class="action-secondary" href="https://github.com/orchiliao/vesty">{context.t('landing.github')} <span aria-hidden="true">↗</span></a>
       </div>
     </div>

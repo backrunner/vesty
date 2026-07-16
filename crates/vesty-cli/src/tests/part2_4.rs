@@ -1711,15 +1711,21 @@ bridge timeout
         let package_paths = UiPackagePaths {
             plugin_ui: Some(Utf8PathBuf::from("/tmp/vesty plugin-ui")),
         };
-        let package_json = ui_package_json(UiTemplate::Vanilla, &package_paths);
+        let package_json = ui_package_json("My Plugin", UiTemplate::Vanilla, &package_paths);
         let value = serde_json::from_str::<serde_json::Value>(&package_json).unwrap();
         assert_eq!(value["private"], true);
+        assert_eq!(value["name"], "my-plugin-editor");
+        assert_ne!(value["name"], "vesty-plugin-ui");
         assert_eq!(
             value["dependencies"]["vesty-plugin-ui"],
             "file:/tmp/vesty plugin-ui"
         );
 
-        let published = ui_package_json(UiTemplate::Vanilla, &UiPackagePaths::default());
+        let published = ui_package_json(
+            "My Plugin",
+            UiTemplate::Vanilla,
+            &UiPackagePaths::default(),
+        );
         let value = serde_json::from_str::<serde_json::Value>(&published).unwrap();
         assert_eq!(value["private"], true);
         assert_eq!(
@@ -1731,6 +1737,7 @@ bridge timeout
     #[test]
     fn ui_templates_emit_framework_specific_files() {
         fn assert_ready_param_binding(source: &str) {
+            assert!(!source.contains("pub(super)"), "{source}");
             assert!(source.contains("type BridgeReadyPayload"));
             assert!(source.contains("type ParamChangedEvent"));
             assert!(source.contains("paramValues"));
@@ -1781,10 +1788,13 @@ bridge timeout
             )
             .unwrap();
             let package_json = fs::read_to_string(root.join("ui/package.json")).unwrap();
+            let tsconfig = fs::read_to_string(root.join("ui/tsconfig.json")).unwrap();
             let index_html = fs::read_to_string(root.join("ui/index.html")).unwrap();
             let vite_config = fs::read_to_string(root.join("ui/vite.config.ts")).unwrap();
             let package = serde_json::from_str::<serde_json::Value>(&package_json).unwrap();
             assert_eq!(package["private"], true);
+            assert!(tsconfig.contains("\"preserveSymlinks\": true"));
+            assert!(vite_config.contains("preserveSymlinks: true"));
 
             match template {
                 UiTemplate::React => {
@@ -2001,5 +2011,3 @@ parameter_manifest = "vesty-parameters.json"
             min_height: None,
         }
     }
-
-

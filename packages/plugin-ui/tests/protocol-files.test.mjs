@@ -43,4 +43,4 @@ assert.match(paramKind, /"float"/);
 assert.match(paramKind, /"bool"/);
 assert.match(paramKind, /"choice"/);
 
-console.log("@vesty/plugin-ui protocol exports ok");
+console.log("vesty-plugin-ui protocol exports ok");

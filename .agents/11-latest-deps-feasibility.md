@@ -1,6 +1,6 @@
 # 11. 最新依赖基线与可行性边界
 
-核查日期: 2026-06-10
+核查日期: 2026-07-16
 
 核查方式:
 
@@ -27,7 +27,7 @@
 
 - `vesty dependency-baseline` 现在覆盖当前 `Cargo.toml [workspace.dependencies]` 中所有外部 Rust 依赖，而不只是 MVP 关键依赖抽样。当前覆盖 `arc-swap`、`atomic_float`、`camino`、`cargo_metadata`、`wry`、`vst3`、`raw-window-handle`、`rtrb`、`serde`、`serde_json`、`ts-rs`、`clap`、`mime_guess`、`plist`、`proc-macro-crate`、`proc-macro2`、`quote`、`schemars`、`syn`、`toml`、`sha2`、`tempfile`、`thiserror` 和 `tracing`。
 - crates.io 查询使用 `cargo search` 优先，并在 search 失败或没有精确结果行时 fallback 到 `cargo info`。本次真实复核中 `cargo search ts-rs --limit 1` 返回 crates.io 500，但 `cargo info ts-rs` 返回 `version: 12.0.1`，最终 latest baseline 通过。
-- `vesty dependency-baseline` 现在还固定 JS framework adapter 的 dev dependency 语义: `@vesty/react` 的 `react` / `@types/react`、`@vesty/vue` 的 `vue`、`@vesty/svelte` 的 `svelte` package.json range 必须保持 `latest`，并校验 package-lock 中的实际安装版本。
+- `vesty dependency-baseline` 固定单个 `vesty-plugin-ui` package 的 dev dependency 语义：`react` / `@types/react`、`vue` 和 `svelte` range 必须保持 `latest`，并校验 package-lock 中的实际安装版本。对应 adapter 通过 `/react`、`/vue`、`/svelte` 子路径导出。
 - `vesty dependency-baseline --latest` 现在会额外查询 npm registry latest `react`、`@types/react`、`vue` 和 `svelte`，确认 lockfile installed version 与 registry latest 一致。本次真实运行通过: `react 19.2.7`、`@types/react 19.2.17`、`vue 3.5.38`、`svelte 5.56.3`。
 - `release-check` 现在会拒绝缺少 `cargo workspace external dependency baseline coverage` 的 latest report，即使 registry latest checks 本身完整；这防止新增外部 workspace dependency 未进入复核基线。
 
@@ -152,11 +152,11 @@ wry = { version = "0.55.1", default-features = false, features = ["protocol", "o
 
 | 用途 | 依赖 | 当前版本 | 结论 |
 | --- | --- | --- | --- |
-| TypeScript compiler | `typescript` | `6.0.3` | `@vesty/plugin-ui`、`@vesty/react`、`@vesty/vue`、`@vesty/svelte` devDependency 使用 `^6.0.3`；lockfile installed version 为 `6.0.3` |
-| React adapter dev dep | `react` | `19.2.7` | `@vesty/react` devDependency range 为 `latest`；lockfile installed version 必须等于 npm registry latest |
-| React types dev dep | `@types/react` | `19.2.17` | `@vesty/react` devDependency range 为 `latest`；lockfile installed version 必须等于 npm registry latest |
-| Vue adapter dev dep | `vue` | `3.5.38` | `@vesty/vue` devDependency range 为 `latest`；lockfile installed version 必须等于 npm registry latest |
-| Svelte adapter dev dep | `svelte` | `5.56.3` | `@vesty/svelte` devDependency range 为 `latest`；lockfile installed version 必须等于 npm registry latest |
+| TypeScript compiler | `typescript` | `7.0.2` | `vesty-plugin-ui` devDependency 使用 `^7.0.2`；lockfile installed version 为 `7.0.2` |
+| React adapter dev dep | `react` | `19.2.7` | `vesty-plugin-ui` devDependency range 为 `latest`；lockfile installed version 必须等于 npm registry latest |
+| React types dev dep | `@types/react` | `19.2.17` | `vesty-plugin-ui` devDependency range 为 `latest`；lockfile installed version 必须等于 npm registry latest |
+| Vue adapter dev dep | `vue` | `3.5.39` | `vesty-plugin-ui` devDependency range 为 `latest`；lockfile installed version 必须等于 npm registry latest |
+| Svelte adapter dev dep | `svelte` | `5.56.5` | `vesty-plugin-ui` devDependency range 为 `latest`；lockfile installed version 必须等于 npm registry latest |
 
 2026-06-09 重新核对: `npm outdated --workspaces --long` 显示 TypeScript 最新为 `6.0.3`，已升级并通过 workspace JS test/typecheck。
 
@@ -168,7 +168,7 @@ wry = { version = "0.55.1", default-features = false, features = ["protocol", "o
 
 - Cargo workspace dependencies: `arc-swap`、`atomic_float`、`camino`、`cargo_metadata`、`wry`、`vst3`、`raw-window-handle`、`rtrb`、`serde`、`serde_json`、`ts-rs`、`clap`、`mime_guess`、`plist`、`proc-macro-crate`、`proc-macro2`、`quote`、`schemars`、`syn`、`toml`、`sha2`、`tempfile`、`thiserror`、`tracing`。
 - VST3 SDK/binding baseline: Steinberg SDK `v3.8.0_build_66`、upstream `vst3` crate `0.3.0`。
-- JS workspace: 四个 `@vesty/*` package 的 `typescript` devDependency 和 `package-lock.json` installed version；React/Vue/Svelte thin adapter 的 framework devDependency range 与 lockfile installed version。
+- JS workspace: `vesty-plugin-ui` 的 `typescript` devDependency 和 `package-lock.json` installed version，以及 React/Vue/Svelte adapter 所需 framework devDependency range 与 lockfile installed version。
 
 命令:
 

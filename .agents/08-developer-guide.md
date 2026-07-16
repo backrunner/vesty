@@ -16,10 +16,10 @@ vesty dev
 
 `--ui` 支持:
 
-- `react`: Vite + React + `@vesty/plugin-ui`。
-- `vue`: Vite + Vue + `@vesty/plugin-ui`。
-- `svelte`: Vite + Svelte + `@vesty/plugin-ui`。
-- `vanilla`: Vite + TypeScript + `@vesty/plugin-ui`。
+- `react`: Vite + React + `vesty-plugin-ui`。
+- `vue`: Vite + Vue + `vesty-plugin-ui`。
+- `svelte`: Vite + Svelte + `vesty-plugin-ui`。
+- `vanilla`: Vite + TypeScript + `vesty-plugin-ui`。
 - `none`: 只生成 Rust 插件，无 Web UI。
 
 `vesty new` 会同时生成 `README.md`、不可发布到 crates.io 的 `Cargo.toml`（`publish = false`）、`params.specs.json`、`vesty-parameters.json` 以及 `[package]` 元数据: 默认 `bundle_id = "dev.vesty.<crate-name>"`，effect 使用 `category = "Fx"`，instrument 使用 `category = "Instrument"`，并写入 `parameter_manifest = "vesty-parameters.json"`。有 UI 的模板还会在 `vesty.toml` 和 Rust `UiDescriptor` 里写入同一组默认 editor 尺寸: 900x560，最小 640x420，可 resize；`ui/package.json` 默认带 `"private": true`，因为它是随 `.vst3` 打包的 UI asset app，不是 npm library package。正式发布前应改成自己的反向域名 bundle id 和目标 VST3 category。
@@ -500,7 +500,7 @@ fn host_changes_for_param(&self, id: &str, old: f64, new: f64) -> HostChangeFlag
 前端可以使用任意 bundler。只需要调用:
 
 ```ts
-import { createBridge } from "@vesty/plugin-ui";
+import { createBridge } from "vesty-plugin-ui";
 
 const bridge = createBridge();
 const hello = await bridge.ready();
@@ -718,7 +718,7 @@ Bundle validation:
 - `vesty release-check --validate-report <path>` 会读取该 JSON report，要求静态 bundle check 为 `ok` 且 Steinberg validator 为 `passed`；`--static-only` 生成的 skipped validator report 不会被当作 release 通过证据。
 - `vesty release-check --validate-report <path>` 在 Vesty framework release 的 `--require-release-artifacts` 下还会要求 `VestyGain.vst3`、`VestyWebUIDemo.vst3`、`VestyMIDISynth.vst3` 在 `linux-x64`、`macos`、`windows-x64` 上都有 Steinberg validator-passed report；这些示例/platform report 还必须包含指向对应 bundle `Contents/Resources/parameters.manifest.json` 的 `static_check.parameter_manifest`，证明 `[package].parameter_manifest` 已进入 packaged `.vst3`。`VestyWebUIDemo.vst3` 额外要求指向 `Contents/Resources/assets.manifest.json` 的 `static_check.asset_manifest` 和非零 `asset_count`。最终 strict gate 还要求每个示例/platform report 含匹配平台且 required/found symbols 完整的 `ok` `static_check.binary_exports`；`skipped` 只能作为诊断记录。生成 release validator report 时应使用 `vesty validate --strict --report <path>`，让导出符号工具缺失或 skipped evidence 在采证阶段直接失败。
 - `vesty crate-package --out <path>` 会为 publishable Rust crates 生成 package readiness report: 当前无内部 workspace 依赖的 crate 会运行真实 `cargo package -p <crate> --allow-dirty --no-verify` 并标记为 `packaged`，仍依赖其它 Vesty workspace crate 的 package 会标记为 `deferred`。`vesty crate-package --check --out <path>` 只复验已有 report。`vesty release-check --crate-package-report <path>` 和 `--release-evidence-dir` 的 `crate-package/crate-package.json` 会把它作为可选预发布 evidence；它不表示已完成 `cargo publish`。
-- `vesty npm-pack --out <path>` 会运行 npm workspace dry-run pack，写入规范 JSON，并立即复用 release gate 校验四个 JS package 的发布边界；`vesty npm-pack --check --out <path>` 只复验已有 report。`vesty release-check --npm-pack-report <path>` 要求 `@vesty/plugin-ui`、`@vesty/react`、`@vesty/vue` 和 `@vesty/svelte` 全部存在，且 packed files 只包含 `dist/**` 和 `package.json`；`--release-evidence-dir` 会自动发现 `npm-pack/npm-pack.json` 或根目录 `npm-pack.json`。
+- `vesty npm-pack --out <path>` 会运行 npm workspace dry-run pack，写入规范 JSON，并立即复用 release gate 校验 `vesty-plugin-ui` 的发布边界；`vesty npm-pack --check --out <path>` 只复验已有 report。React/Vue/Svelte adapter 作为 `vesty-plugin-ui/react`、`vesty-plugin-ui/vue` 和 `vesty-plugin-ui/svelte` 子路径随同一个 tarball 发布，packed files 只允许位于 `dist/**` 或 `package.json`；`--release-evidence-dir` 会自动发现 `npm-pack/npm-pack.json` 或根目录 `npm-pack.json`。
 - `vesty release-check --platform-smoke-dir <dir>` 会读取 `vesty platform-smoke --format json` 风格的 macOS、Windows x64、Linux X11 report；`--require-release-artifacts` 会要求三平台都存在且真实通过，Linux Wayland report 会被拒绝；手写 report 也会复用平台特异 WebView 和 Steinberg/VST3 validator passed/0 failed evidence 校验。
 - `vesty release-check --static-validate-report <path>` 会读取 `vesty validate --static-only --report` JSON，只证明 CI packaging smoke 的 bundle 结构、平台 binary 魔数/架构，以及可观察到的导出符号状态；它不会替代 `--validate-report` 的 Steinberg validator passed 证据。Vesty framework release 的 `--require-release-artifacts` 会额外要求 `VestyGain.vst3`、`VestyWebUIDemo.vst3`、`VestyMIDISynth.vst3` 在 `linux-x64`、`macos`、`windows-x64` 上都有 static validate report；这些示例 static reports 同样必须带指向对应 bundle `Contents/Resources/parameters.manifest.json` 的 `static_check.parameter_manifest`，Web UI 示例还必须带指向 `Contents/Resources/assets.manifest.json` 的 UI asset manifest evidence，并且最终 strict gate 要求匹配平台的 `static_check.binary_exports` 为完整 `ok` evidence。生成 release package evidence 时推荐运行 `vesty validate --static-only --strict --report <path>`，让 skipped binary export evidence 在 CI 阶段失败而不是等到最终聚合门禁。
 - `vesty release-check --release-evidence-dir <dir>` 会额外扫描目录内其它 `*.json` validate reports；validator-passed reports 自动进入 release validate evidence，static-only/skipped reports 自动进入 CI static validate smoke，方便直接使用 CI package artifact 解压目录。目录中的 macOS `.vst3` 只有在 `Contents/_CodeSignature/CodeResources` 是可解析 plist，且包含 `files` 或 `files2` dictionary 条目时才会被当作 signed bundle evidence；占位文本文件或字符串值不会通过。

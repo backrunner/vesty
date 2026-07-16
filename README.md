@@ -129,7 +129,7 @@ The audio `process` path must not allocate, lock, block, perform JSON work, call
 ## Repository Layout
 
 - `crates/`: Rust framework, VST3 adapter, WebView runtime, build support, macros, and CLI.
-- `packages/`: `@vesty/plugin-ui` plus React, Vue, and Svelte adapters.
+- `packages/`: `vesty-plugin-ui` plus React, Vue, and Svelte adapters.
 - `examples/`: example VST3 plugins and Web UI assets.
 - `docs/`: multilingual Svedocs site, tutorials, guides, and references.
 - `skills/`: installable AI development workflows for Vesty projects.

@@ -4,7 +4,7 @@ import {
   type PluginSnapshot,
   type SnapshotStoreOptions,
   type VestyBridge
-} from "@vesty/plugin-ui";
+} from "./index.js";
 
 export interface VestyParamEditActions {
   begin(gestureId?: string): Promise<void>;

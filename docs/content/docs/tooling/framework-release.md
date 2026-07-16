@@ -11,15 +11,15 @@ Vesty releases are tag-driven. A release tag publishes the framework SDK and CLI
 Complete the first crates.io and npm publications manually. Both registries require a package to exist before its owner can add a trusted publisher. After the packages exist, create two protected GitHub environments with no registry secrets:
 
 - `crates-io` protects the `publish-crates` job. For every Vesty crate, add a GitHub trusted publisher with repository owner `backrunner`, repository name `vesty`, workflow filename `release.yml`, and environment `crates-io`.
-- `npm` protects the `publish-npm` job. For all four `@vesty/*` packages, add a GitHub Actions trusted publisher with repository owner `backrunner`, repository name `vesty`, workflow filename `release.yml`, and environment `npm`.
+- `npm` protects the `publish-npm` job. For `vesty-plugin-ui`, add a GitHub Actions trusted publisher with repository owner `backrunner`, repository name `vesty`, workflow filename `release.yml`, and environment `npm`.
 
 Require reviewer approval on both environments. The workflow requests GitHub OIDC identity tokens and exchanges them for short-lived registry credentials; it does not read a crates.io or npm publishing secret.
 
-The GitHub repository must exist at `backrunner/vesty` before either registry publisher is configured. If the final repository owner changes, update the documentation and use that exact owner in all 17 publisher records.
+The GitHub repository must exist at `backrunner/vesty` before either registry publisher is configured. If the final repository owner changes, update the documentation and use that exact owner in all 14 publisher records.
 
 ## Prepare a version
 
-Use one SemVer value across `[workspace.package].version`, every Vesty crate, and every `packages/*/package.json`. Internal `@vesty/plugin-ui` peer and development dependencies must use the same exact version.
+Use one SemVer value across `[workspace.package].version`, every Vesty crate, and `packages/plugin-ui/package.json`.
 
 For example, an alpha release uses a tag such as `v0.1.0-alpha.1`; a stable release uses `v0.1.0`. Do not add build metadata to release tags.
 
@@ -52,7 +52,7 @@ The release workflow then:
 2. Generates and checks publish-plan, crate-package, and npm-pack evidence.
 3. Builds Linux x64, universal macOS, and Windows x64 CLI archives.
 4. Publishes 13 crates in dependency order and waits for each crates.io index entry.
-5. Publishes `@vesty/plugin-ui` before the React, Vue, and Svelte adapters.
+5. Publishes `vesty-plugin-ui`, including its React, Vue, and Svelte subpath adapters.
 6. Runs each released CLI against a generated Rust project and runs an additional React template build.
 7. Generates `SHA256SUMS`, build provenance attestations, and the GitHub Release.
 

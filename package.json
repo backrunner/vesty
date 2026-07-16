@@ -6,7 +6,7 @@
   ],
   "scripts": {
     "build": "npm --workspaces run build",
-    "typecheck": "npm run build --workspace @vesty/plugin-ui && npm --workspaces run typecheck",
+    "typecheck": "npm run typecheck --workspace vesty-plugin-ui",
     "test": "npm --workspaces run test"
   }
 }

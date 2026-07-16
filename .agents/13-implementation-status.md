@@ -1,6 +1,6 @@
 # Vesty 当前实现状态
 
-更新时间: 2026-06-13
+更新时间: 2026-07-16
 
 ## 当前阶段
 
@@ -8,17 +8,19 @@ Vesty 已进入 alpha skeleton 状态: workspace、核心 API、VST3 adapter、w
 
 还不能宣称达到完整发布验收: 真实 DAW smoke matrix 尚未完成。因此“多 DAW 兼容性”仍是外部验证项。
 
+2026-07-16 起，前端 SDK 已从四个独立 npm package 合并为唯一发布包 `vesty-plugin-ui`。本文件后半部分按日期保留的旧验证记录可能描述合并前的四包布局；当前实现、脚手架与发布流程一律以 root、`/protocol`、`/react`、`/vue`、`/svelte` 子路径为准。
+
 ## 已实现
 
 - Cargo workspace: `vesty` facade、`vesty-core`、`vesty-params`、`vesty-rt`、`vesty-vst3`、`vesty-vst3-sys`、`vesty-ipc`、`vesty-bridge`、`vesty-ui`、`vesty-ui-wry`、`vesty-build`、`vesty-cli`、`vesty-macros`。
-- JS package: `packages/plugin-ui`，提供 framework-agnostic bridge API。
-  - package build 产物为 `packages/plugin-ui/dist/index.js` 和 `packages/plugin-ui/dist/index.d.ts`。
+- JS package: `packages/plugin-ui`，发布名为 `vesty-plugin-ui`，提供 framework-agnostic bridge API 与 framework adapter 子路径。
+  - package build 产物包括 `dist/index.*`、`dist/protocol/**`、`dist/react.*`、`dist/vue.*` 和 `dist/svelte.*`。
   - `createSnapshotStore(bridge)` 提供 framework-agnostic snapshot external store，已被 React/Vue/Svelte 薄适配复用。
 - JS framework adapters:
-  - `packages/react` 发布名 `@vesty/react`，提供 `VestyBridgeProvider`、`useVestyBridge()`、`useVestySnapshotStore()`、`useVestySnapshot()` 和 `useVestyParamEdit()`。
-  - `packages/vue` 发布名 `@vesty/vue`，提供 `useVestySnapshot()` 和 `useVestyParamEdit()` composables。
-  - `packages/svelte` 发布名 `@vesty/svelte`，提供 `vestySnapshotStore()` 和 `vestyParamEdit()` stores/helpers。
-  - 三个 adapter 只依赖 `@vesty/plugin-ui` bridge/store/param gesture API，不引入额外 native runtime。
+  - `vesty-plugin-ui/react` 提供 `VestyBridgeProvider`、`useVestyBridge()`、`useVestySnapshotStore()`、`useVestySnapshot()` 和 `useVestyParamEdit()`。
+  - `vesty-plugin-ui/vue` 提供 `useVestySnapshot()` 和 `useVestyParamEdit()` composables。
+  - `vesty-plugin-ui/svelte` 提供 `vestySnapshotStore()` 和 `vestyParamEdit()` stores/helpers。
+  - 三个 adapter 位于同一个 npm package，只包装 bridge/store/param gesture API，不引入额外 native runtime；React、Vue、Svelte 是 optional peer dependencies。
 - Examples: `examples/gain`、`examples/midi-synth`、`examples/web-ui-param-demo`。
   - `gain` 是 headless effect 示例。
   - `midi-synth` 是 headless instrument 示例，同时展示 VST3 program list metadata、host-visible program-change 参数、program attributes/pitch names、controller-side program data JSON roundtrip、固定 SysEx level override 和 Note Expression brightness/tuning DSP 消费路径。
@@ -84,9 +86,9 @@ Vesty 已进入 alpha skeleton 状态: workspace、核心 API、VST3 adapter、w
   - packet envelope。
   - hello/ready。
   - `bridge.hello` typed payload: JS SDK 和 wry bootstrap 会发送 `supportedProtocolVersions`、JS package/bootstrap version 和 page URL；Rust bridge runtime 校验 payload schema，并要求版本列表包含当前协议版本 1。
-  - `ready()` 幂等: `@vesty/plugin-ui` 和 wry bootstrap 在同一个 bridge instance 内会复用并发 ready promise；成功后缓存 ready payload，后续 `ready()` 不再重复发送 `bridge.hello` / `bridge.readyAck`，失败时清空 promise 以允许重试。
+  - `ready()` 幂等: `vesty-plugin-ui` 和 wry bootstrap 在同一个 bridge instance 内会复用并发 ready promise；成功后缓存 ready payload，后续 `ready()` 不再重复发送 `bridge.hello` / `bridge.readyAck`，失败时清空 promise 以允许重试。
   - `bridge.ready` capabilities: ready payload 暴露 `paramGestures`、`paramFormatParse`、`stateConfig`、`subscriptions`、`meterStream` 和 `reliableEvents`，供 Web UI feature gating。
-  - `@vesty/plugin-ui` 现在把 Rust IPC 生成的协议 TypeScript snapshot 打包到 `dist/protocol`，并通过 `@vesty/plugin-ui/protocol` 子路径暴露；顶层 SDK 继续 re-export 常用协议类型，React/Vue/Svelte 薄适配仍复用顶层类型。
+  - `vesty-plugin-ui` 现在把 Rust IPC 生成的协议 TypeScript snapshot 打包到 `dist/protocol`，并通过 `vesty-plugin-ui/protocol` 子路径暴露；顶层 SDK 继续 re-export 常用协议类型，React/Vue/Svelte 薄适配仍复用顶层类型。
   - snapshot、state config、persistent UI state。
   - `state.setConfig` 使用 `baseRevision` 做 config revision 冲突检测，冲突时返回 `state_conflict` 并附最新 snapshot。
   - `state.setUiState` 使用 `baseRevision` 做 UI revision 冲突检测，成功后整块替换 `PluginSnapshot.uiState`，冲突时返回 `state_conflict` 并附最新 snapshot。
@@ -130,7 +132,7 @@ Vesty 已进入 alpha skeleton 状态: workspace、核心 API、VST3 adapter、w
   - `vesty-rt::meter_spsc()` 基于 `rtrb`，`RtMeterProducer` 实现 `MeterSink`，队列满时返回 false 并丢弃该帧。
   - VST3 processor 创建 RT-safe meter SPSC producer，并在 `IAudioProcessor::process` 中作为 `MeterSink` 注入 `ProcessContext`；audio thread 不做 JSON、WebView、锁或 host message 分配。
   - VST3 factory 持有 telemetry registry；processor/controller 通过 `IConnectionPoint` 上的内部 `IMessage` 绑定 telemetry id，让 controller 获取对应 `RtMeterConsumer`。
-  - wry bootstrap 与 `@vesty/plugin-ui` 在订阅 `meter.*`、`param.changed`、`diagnostics.fault` 或 `log.rt` topic 时启动约 60 Hz 的 `event.flush` async event pump；UI/control thread drain SPSC、pending host param changes、fault/log snapshot 后通过 bridge batch 回推 JS。
+  - wry bootstrap 与 `vesty-plugin-ui` 在订阅 `meter.*`、`param.changed`、`diagnostics.fault` 或 `log.rt` topic 时启动约 60 Hz 的 `event.flush` async event pump；UI/control thread drain SPSC、pending host param changes、fault/log snapshot 后通过 bridge batch 回推 JS。
   - `examples/web-ui-param-demo` 的 DSP kernel 调用 `emit_output_meter()`，打包 UI 订阅 `meter.main` 并显示 peak。
   - `vesty-rt::log_spsc()` 提供非阻塞 RT log queue；`RtLogEvent` 使用固定 enum/code/数字 payload，不在 audio thread 做字符串格式化，队列满时 `try_push` 返回 error 由调用方丢弃/计数。
   - VST3+wry 首版真实接线: WebView IPC `param.begin/perform/end` 进入 Rust bridge，并 relay 到 VST3 `IComponentHandler`。
@@ -259,7 +261,7 @@ Vesty 已进入 alpha skeleton 状态: workspace、核心 API、VST3 adapter、w
   - `vesty-ui-wry` 注入 bootstrap 在存在 `meter.*`、`param.changed`、`diagnostics.fault` 或 `log.rt` 订阅时以约 60 Hz 发送 `event.flush`，无异步事件订阅时停止 pump。
   - `vesty-ui-wry` 和 `packages/plugin-ui` 提供 `setConfig(key, value, baseRevision)` 与 `setUiState(value, baseRevision)` typed API。
   - `packages/plugin-ui` 与 wry bootstrap 对齐订阅和 async event pump 语义，并在 `postMessage` 前登记 Promise pending，避免同步/快速 response 丢失。
-  - `packages/plugin-ui` 与 wry bootstrap 已实现 request timeout：默认 5000ms；TS SDK 可通过 `createBridge(..., { timeoutMs })` 配置，超时和同步 `postMessage` 失败都会释放 pending/timer；`@vesty/plugin-ui` 会在初始化时校验 host 必须能注册 unload listener、`initialSession` 必须是非空/长度受限/无控制字符字符串、`options` 必须是 object、`timeoutMs` 必须是 finite number，无效输入返回 non-retryable `validation_error`，不会注册 unload listener、创建 `__VESTY_INTERNAL__` 或发送 IPC。
+  - `packages/plugin-ui` 与 wry bootstrap 已实现 request timeout：默认 5000ms；TS SDK 可通过 `createBridge(..., { timeoutMs })` 配置，超时和同步 `postMessage` 失败都会释放 pending/timer；`vesty-plugin-ui` 会在初始化时校验 host 必须能注册 unload listener、`initialSession` 必须是非空/长度受限/无控制字符字符串、`options` 必须是 object、`timeoutMs` 必须是 finite number，无效输入返回 non-retryable `validation_error`，不会注册 unload listener、创建 `__VESTY_INTERNAL__` 或发送 IPC。
   - `packages/plugin-ui` 与 wry bootstrap 已实现 UI unload cleanup：`pagehide` / `beforeunload` 会停止 async event pump，清空 JS 侧 topic listeners，并 reject 所有 pending request，降低 WebView reload/close 时的 Promise、handler 和 interval 残留风险。
   - `packages/plugin-ui` 与 wry bootstrap 已实现 subscription listener 异常隔离：单个 handler 抛错只记录 console error，不会阻断同 topic 其它 handler 或同批 `deliverBatch` 后续 packet。
   - `packages/plugin-ui` 的 `createSnapshotStore()` 已实现 runtime input 校验与 snapshot listener 异常隔离：`options` 必须是 object，`topic` 复用 subscription topic 校验，`refreshOnEvent` 必须是 boolean，`subscribe(listener)` 会先校验 listener 必须是 function，`select(selector)` 会先校验 selector 必须是 function；无效输入返回 non-retryable `validation_error` 且不会触发底层 `subscription.add`。单个 listener 抛错只记录 console error，不会阻断其它 listener，也不会让 `refresh()` 因 UI 回调异常而 reject；React/Vue/Svelte adapter 共享该行为。
@@ -269,7 +271,7 @@ Vesty 已进入 alpha skeleton 状态: workspace、核心 API、VST3 adapter、w
   - `packages/plugin-ui` 与 wry bootstrap 已实现 `bridge.readyAck`：ready payload 后用 editor session ack；`vesty-bridge` 要求 readyAck 必须发生在成功 `bridge.hello` 之后，并校验 ack payload 的 `protocolVersion` 存在、类型为非负整数且等于当前协议版本，提前 ack、缺失/类型错误或不支持版本都不会把 runtime 标记为 ready，校验通过后记录 `ready_acknowledged()` 并返回 `bridge.readyAck.response`。
   - `vesty-ipc`、`vesty-bridge`、`vesty-vst3` 和 `packages/plugin-ui` 已接入 `BridgeCapabilities`；ready response 测试覆盖 capabilities 字段。
   - `BridgeCapabilities` 增加 `diagnostics`；`vesty-ipc` 导出 `BridgeDiagnosticsSnapshot` 和 `PluginFaultReport` 的 TypeScript/JSON Schema。
-  - `vesty-ipc` 导出 `RtLogRecord` / `RtLogLevel` / `RtLogKind` / `RtLogQueue`；`@vesty/plugin-ui` 同步提供这些 TS 类型。
+  - `vesty-ipc` 导出 `RtLogRecord` / `RtLogLevel` / `RtLogKind` / `RtLogQueue`；`vesty-plugin-ui` 同步提供这些 TS 类型。
   - `vesty-bridge` 支持 `diagnostics.get`，返回 ready ack、订阅、待处理 param/meter、`droppedParamGestures` 和 fault report 快照。
   - `vesty-bridge` 支持订阅式 `diagnostics.fault` 事件，仍由订阅表过滤，未订阅不推送。
   - `vesty-bridge` 支持订阅式 `log.rt` 事件，payload 为结构化 `RtLogRecord`，走 `BridgeLane::Log`。
@@ -328,12 +330,12 @@ Vesty 已进入 alpha skeleton 状态: workspace、核心 API、VST3 adapter、w
   - `vesty-cli` 模板测试确认新项目不再生成手写 `impl ParamCollection` 样板。
 - UI template 补强:
   - `vesty new --ui react|vue|svelte|vanilla|none` 已分流生成对应 UI 模板。
-  - React/Vue/Svelte 模板生成 Vite config、框架入口组件，并通过 `@vesty/react`、`@vesty/vue`、`@vesty/svelte` 薄适配调用 param gesture helper；底层 bridge 仍来自 framework-agnostic `@vesty/plugin-ui`。
-  - `vesty new --plugin-ui-path ...` 会自动推断 sibling `packages/react`、`packages/vue`、`packages/svelte`，生成本地 `file:` adapter dependency，便于当前 workspace smoke；未提供本地路径时使用发布依赖。
+  - React/Vue/Svelte 模板生成 Vite config、框架入口组件，并通过 `vesty-plugin-ui/react`、`vesty-plugin-ui/vue`、`vesty-plugin-ui/svelte` 薄适配调用 param gesture helper；底层 bridge 仍来自 framework-agnostic `vesty-plugin-ui`。
+  - `vesty new --plugin-ui-path ...` 会把唯一的 `vesty-plugin-ui` dependency 写成本地 `file:` 路径；框架 adapter 继续通过该依赖的子路径导入。
   - React 模板使用 `tsc --noEmit` 并声明 `@types/react` / `@types/react-dom`；Vue 模板使用 `vue-tsc --noEmit`；Svelte 模板使用 `svelte-check --tsconfig ./tsconfig.json`。
-  - 本机 smoke 将 `@vesty/plugin-ui` 临时指向 workspace package 后，vanilla/React/Vue/Svelte 四个模板均完成 `npm install` + `npm run build` + `npm run typecheck`，并且生成的 Rust 插件均可 `cargo check`。
+  - 本机 smoke 将 `vesty-plugin-ui` 临时指向 workspace package 后，vanilla/React/Vue/Svelte 四个模板均完成 `npm install` + `npm run build` + `npm run typecheck`，并且生成的 Rust 插件均可 `cargo check`。
   - `vesty new --vesty-path ...` 可把生成项目依赖指向当前 workspace 的 `crates/vesty`，生成 Cargo.toml 默认带空 `[workspace]`，便于在任意父 workspace 下作为独立插件项目 `cargo check`。
-  - `vesty new --plugin-ui-path ...` 可把生成 UI 的 `@vesty/plugin-ui` 依赖写成本地 `file:` dependency，免去 smoke 时手工 patch `package.json`。
+  - `vesty new --plugin-ui-path ...` 可把生成 UI 的 `vesty-plugin-ui` 依赖写成本地 `file:` dependency，免去 smoke 时手工 patch `package.json`。
   - `vesty new` 生成的 `vesty.toml` 已包含 `[package]` 默认元数据: effect 使用 `bundle_id = "dev.vesty.<crate-name>"` / `category = "Fx"`，instrument 使用 `category = "Instrument"`。
 - 新增 GitHub Actions CI workflow:
   - `rust` job 跑 `cargo fmt --all --check`、`cargo test --workspace`、`cargo clippy --workspace --all-targets -- -D warnings`、VST3 bindings/wry feature tests 和对应 feature clippy gates。
@@ -363,10 +365,10 @@ cd /tmp/vesty-adapter-smoke.u5oxcP/vesty-<ui>-smoke && cargo check
 
 新增行为:
 
-- React 模板依赖并使用 `@vesty/react` 的 `VestyBridgeProvider` / `useVestyParamEdit()`。
-- Vue 模板依赖并使用 `@vesty/vue` 的 `useVestyParamEdit()`。
-- Svelte 模板依赖并使用 `@vesty/svelte` 的 `vestyParamEdit()`。
-- 当 `--plugin-ui-path` 指向当前 workspace 的 `packages/plugin-ui` 时，CLI 会自动把 sibling adapter package 写成本地 `file:` dependency；三种 UI 模板均已真实 npm build/typecheck，并且生成的 Rust 插件均已 `cargo check`。
+- React 模板依赖并使用 `vesty-plugin-ui/react` 的 `VestyBridgeProvider` / `useVestyParamEdit()`。
+- Vue 模板依赖并使用 `vesty-plugin-ui/vue` 的 `useVestyParamEdit()`。
+- Svelte 模板依赖并使用 `vesty-plugin-ui/svelte` 的 `vestyParamEdit()`。
+- 当 `--plugin-ui-path` 指向当前 workspace 的 `packages/plugin-ui` 时，CLI 只写入一个本地 `file:` dependency；三种 UI 模板从该包的子路径导入 adapter。
 
 ## 已验证
 
@@ -452,7 +454,7 @@ cargo check -p vesty-ui-wry --features wry-backend
 cargo test -p vesty-ui-wry --features wry-backend asset_protocol_uses_manifest_allowlist
 ```
 
-本次 2026-06-08 针对 JSBridge request timeout、pending/timer 清理和 `@vesty/plugin-ui` dist 重新通过:
+本次 2026-06-08 针对 JSBridge request timeout、pending/timer 清理和 `vesty-plugin-ui` dist 重新通过:
 
 ```bash
 npx -y -p typescript@latest tsc -p packages/plugin-ui/tsconfig.json
@@ -467,7 +469,7 @@ cargo check -p vesty-vst3 --features 'vst3-bindings wry-ui'
 cargo check -p vesty-ui-wry --features wry-backend
 ```
 
-本次 2026-06-08 针对 JSBridge request packet sequencing 和 `@vesty/plugin-ui` Node 测试脚手架通过:
+本次 2026-06-08 针对 JSBridge request packet sequencing 和 `vesty-plugin-ui` Node 测试脚手架通过:
 
 ```bash
 npm test
@@ -480,7 +482,7 @@ cargo fmt --all --check
 
 新增行为:
 
-- `@vesty/plugin-ui` 与 wry bootstrap 现在对每个 JS request 使用同一个递增值生成 `id` 后缀和 `seq`；首包为 `id=js-1, seq=1`，readyAck 为 `id=js-2, seq=2`。
+- `vesty-plugin-ui` 与 wry bootstrap 现在对每个 JS request 使用同一个递增值生成 `id` 后缀和 `seq`；首包为 `id=js-1, seq=1`，readyAck 为 `id=js-2, seq=2`。
 - `packages/plugin-ui/tests/bridge.test.mjs` 固定验证普通 request sequencing、`bridge.hello` typed payload、editor session adoption 和 `bridge.readyAck` sequencing；root `npm test` 会跑所有 workspace package test。
 
 本次 2026-06-08 针对 GitHub Actions JS SDK test gate 通过:
@@ -495,7 +497,7 @@ cargo fmt --all --check
 
 新增行为:
 
-- `.github/workflows/ci.yml` 的 `js sdk` job 已在 `npm run typecheck` 和 `npm run build` 之间加入 `npm test`，确保 `@vesty/plugin-ui` 的 bridge sequencing Node 测试进入 CI。
+- `.github/workflows/ci.yml` 的 `js sdk` job 已在 `npm run typecheck` 和 `npm run build` 之间加入 `npm test`，确保 `vesty-plugin-ui` 的 bridge sequencing Node 测试进入 CI。
 
 本次 2026-06-08 针对 `HostChangeFlags` 和 VST3 dynamic latency restart notification 重新通过:
 
@@ -566,7 +568,7 @@ cargo check -p vesty-ui-wry --features wry-backend
 
 新增行为:
 
-- `@vesty/plugin-ui` 的 `deliver` 会先比较入站 packet session；stale response 不会 resolve/reject 当前 pending request，stale event 不会触发 subscriber。
+- `vesty-plugin-ui` 的 `deliver` 会先比较入站 packet session；stale response 不会 resolve/reject 当前 pending request，stale event 不会触发 subscriber。
 - wry bootstrap 内置 `window.__VESTY_INTERNAL__.deliver` 也使用相同 session 过滤，保持无框架 UI 和 SDK UI 行为一致。
 
 本次 2026-06-08 针对 typed `bridge.hello` payload 和 protocol version negotiation 重新通过:
@@ -596,7 +598,7 @@ cargo check -p vesty-ui-wry --features wry-backend
 
 新增行为:
 
-- `@vesty/plugin-ui` 的 `ready()` 现在会拒绝缺失或非 `1` 的 `protocolVersion`，返回 `unsupported_version` 且 `retryable = false`。
+- `vesty-plugin-ui` 的 `ready()` 现在会拒绝缺失或非 `1` 的 `protocolVersion`，返回 `unsupported_version` 且 `retryable = false`。
 - JS SDK 在不兼容 hello response 下不会采纳 `editorSessionId`，也不会发送 `bridge.readyAck`；测试覆盖 `protocolVersion: 2` 时 posted packet 只包含 `bridge.hello`。
 - wry 注入 bootstrap 与 JS SDK 保持相同行为，内置 `assertCompatibleReadyPayload()` 和 `unsupportedProtocolError()`。
 
@@ -672,7 +674,7 @@ npm test
 - `state.setUiState` 是 typed state command，payload 为 `{ baseRevision, value }`，其中 `baseRevision` 对应当前 `uiRevision`。
 - 成功提交会整块替换 `PluginSnapshot.uiState`，并递增 `revision` / `uiRevision`。
 - stale `uiRevision` 返回 retryable `state_conflict`，error details 带最新 snapshot。
-- `@vesty/plugin-ui` 与 wry bootstrap 都暴露 `setUiState(value, baseRevision)`。
+- `vesty-plugin-ui` 与 wry bootstrap 都暴露 `setUiState(value, baseRevision)`。
 
 本次 2026-06-08 针对 `state.changed` snapshot event 闭环通过:
 
@@ -686,7 +688,7 @@ cargo clippy -p vesty-bridge --all-targets -- -D warnings
 新增行为:
 
 - `state.setConfig` / `state.setUiState` 成功后先返回 request response，再按订阅表发送 `state.changed` event。
-- `state.changed` payload 是完整 `PluginSnapshot`，可被 `@vesty/plugin-ui` 的 `createSnapshotStore()` 直接发布。
+- `state.changed` payload 是完整 `PluginSnapshot`，可被 `vesty-plugin-ui` 的 `createSnapshotStore()` 直接发布。
 - 未订阅 `state.changed` 时仍只发送 request response，保持 reliable event 订阅过滤语义。
 
 本次 2026-06-08 针对 JSBridge config/UI state 的 VST3 controller 持久化通过:
@@ -720,7 +722,7 @@ npm test
 - `vesty-bridge::emit_param_changed()` 使用订阅表过滤 `param.changed`，并生成 `ParamChangedEvent` payload。
 - 每次 param changed event 会递增 bridge snapshot 的 `revision` / `paramsRevision`。
 - VST3 wry bridge 的 UI `param.perform` relay 在 host `performEdit()` 返回 OK 后，会回推 `param.changed`，payload 包含 `source = "ui"` 和原始 `gestureId`，用于前端 echo suppression。
-- `@vesty/plugin-ui` 同步导出 `ParamChangedEvent` 和 `ParamChangeSource` TypeScript 类型。
+- `vesty-plugin-ui` 同步导出 `ParamChangedEvent` 和 `ParamChangeSource` TypeScript 类型。
 
 本次 2026-06-08 针对 host/controller -> Web UI `param.changed` 闭环通过:
 
@@ -736,7 +738,7 @@ npm test
 
 - `vesty-bridge` 支持轻量 `event.flush` request，供 UI/control 线程 drain 异步事件源。
 - `vesty-vst3` controller 在非实时路径 coalesce host/controller 参数变化；订阅 `param.changed` 前的 latest-wins 值会保留到订阅建立后，订阅后的 host 参数变化会在下一次 `event.flush` 回推。
-- `@vesty/plugin-ui` 与 wry bootstrap 的 pump 从 meter-only 扩展到 async event pump，覆盖 `meter.*`、`param.changed`、`diagnostics.fault` 和 `log.rt`。
+- `vesty-plugin-ui` 与 wry bootstrap 的 pump 从 meter-only 扩展到 async event pump，覆盖 `meter.*`、`param.changed`、`diagnostics.fault` 和 `log.rt`。
 
 本次 2026-06-08 针对 Rust IPC -> TypeScript/JSON Schema protocol export 通过:
 
@@ -879,7 +881,7 @@ cargo run -p vesty-cli -- new demo-react --ui react
 cargo run -p vesty-cli -- new demo-vue --ui vue
 cargo run -p vesty-cli -- new demo-svelte --ui svelte
 cd /Users/orchiliao/Projects/vesty
-for app in demo-react demo-vue demo-svelte; do npm pkg set 'dependencies.@vesty/plugin-ui=file:../../../../packages/plugin-ui' --prefix target/vesty-template-smoke/$app/ui >/dev/null; npm install --prefix target/vesty-template-smoke/$app/ui; npm run build --prefix target/vesty-template-smoke/$app/ui; done
+for app in demo-react demo-vue demo-svelte; do npm pkg set 'dependencies.vesty-plugin-ui=file:../../../../packages/plugin-ui' --prefix target/vesty-template-smoke/$app/ui >/dev/null; npm install --prefix target/vesty-template-smoke/$app/ui; npm run build --prefix target/vesty-template-smoke/$app/ui; done
 ```
 
 本次 2026-06-08 针对 vanilla/React/Vue/Svelte UI templates 最新依赖 typecheck 补强并通过:
@@ -958,7 +960,7 @@ cargo run -p vesty-cli -- new demo-ui-effect --ui vanilla --vesty-path /Users/or
 cargo check --manifest-path demo-ui-effect/Cargo.toml
 ```
 
-本次 2026-06-08 针对 generated scaffold local Rust + local `@vesty/plugin-ui` path 通过:
+本次 2026-06-08 针对 generated scaffold local Rust + local `vesty-plugin-ui` path 通过:
 
 ```bash
 cargo test -p vesty-cli ui_package_template_can_use_local_plugin_ui_path
@@ -966,7 +968,7 @@ rm -rf target/vesty-new-local-ui-smoke
 mkdir -p target/vesty-new-local-ui-smoke
 cd target/vesty-new-local-ui-smoke
 cargo run -p vesty-cli -- new demo-local-ui --ui vanilla --vesty-path /Users/orchiliao/Projects/vesty/crates/vesty --plugin-ui-path /Users/orchiliao/Projects/vesty/packages/plugin-ui
-node -e 'const fs=require("fs"); const pkg=JSON.parse(fs.readFileSync("demo-local-ui/ui/package.json","utf8")); if(pkg.dependencies["@vesty/plugin-ui"]!=="file:/Users/orchiliao/Projects/vesty/packages/plugin-ui") process.exit(1);'
+node -e 'const fs=require("fs"); const pkg=JSON.parse(fs.readFileSync("demo-local-ui/ui/package.json","utf8")); if(pkg.dependencies["vesty-plugin-ui"]!=="file:/Users/orchiliao/Projects/vesty/packages/plugin-ui") process.exit(1);'
 cargo check --manifest-path demo-local-ui/Cargo.toml
 npm install --prefix demo-local-ui/ui
 npm run build --prefix demo-local-ui/ui
@@ -1421,10 +1423,10 @@ cargo fmt --all --check
 确认结果:
 
 - `cargo test --workspace` 覆盖全部 Rust crate、examples 和 doc-tests，VST3 并发测试没有再出现共享 no-allocation 状态污染。
-- `npm test` 覆盖 `@vesty/plugin-ui` 的 Node bridge sequencing 测试，并重新构建 package dist。
+- `npm test` 覆盖 `vesty-plugin-ui` 的 Node bridge sequencing 测试，并重新构建 package dist。
 - `npm run typecheck`、`npm run build`、Rust clippy、feature-gated checks 和 format check 均通过。
 
-本次 2026-06-08 针对 `@vesty/plugin-ui` subscription reference counting 和 async event pump 行为补充 Node 测试并通过:
+本次 2026-06-08 针对 `vesty-plugin-ui` subscription reference counting 和 async event pump 行为补充 Node 测试并通过:
 
 ```bash
 npm test
@@ -1451,7 +1453,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 新增覆盖:
 
 - `bootstrap_script_registers_host_subscriptions` 现在固定验证 bootstrap 脚本包含首个 handler 才 `subscription.add`、最后一个 handler 才 `subscription.remove` 的引用计数逻辑。
-- 同一测试固定验证 `meter.*` topic 检测、`meterPump` 单例启动和 `clearInterval(meterPump)` 停止逻辑，避免 wry 注入脚本与 `@vesty/plugin-ui` SDK 行为漂移。
+- 同一测试固定验证 `meter.*` topic 检测、`meterPump` 单例启动和 `clearInterval(meterPump)` 停止逻辑，避免 wry 注入脚本与 `vesty-plugin-ui` SDK 行为漂移。
 
 本次 2026-06-08 针对 release artifact evidence 目录自动发现补强并通过:
 
@@ -1723,7 +1725,7 @@ cargo test -p vesty-cli validator_summary_extracts_passed_and_failed_counts
 - 解析器现在支持 canonical `Result: 47 tests passed, 0 tests failed`、带时间戳/前缀的 result 行、大小写变化、`Tests passed: 47` / `Tests failed: 0` 拆行，以及单数 `1 test passed`。
 - 仍然要求 passed 和 failed 两个计数都出现；只有 `tests passed` 的摘要不会产生 release-valid 的计数字段。
 
-本次 2026-06-08 针对 `@vesty/plugin-ui` 参数 helper API 测试覆盖通过:
+本次 2026-06-08 针对 `vesty-plugin-ui` 参数 helper API 测试覆盖通过:
 
 ```bash
 npm test
@@ -1748,9 +1750,9 @@ npm test
 
 新增行为:
 
-- `@vesty/react` 提供 bridge context、snapshot store hook、snapshot hook 和 param edit hook。
-- `@vesty/vue` 提供 snapshot composable 和 param edit composable。
-- `@vesty/svelte` 提供 snapshot readable store 和 param edit helper。
+- `vesty-plugin-ui/react` 提供 bridge context、snapshot store hook、snapshot hook 和 param edit hook。
+- `vesty-plugin-ui/vue` 提供 snapshot composable 和 param edit composable。
+- `vesty-plugin-ui/svelte` 提供 snapshot readable store 和 param edit helper。
 - 三个包的 `dist/index.js` / `dist/index.d.ts` 均由 TypeScript build 生成，并通过 workspace export smoke test。
 
 本次 2026-06-08 针对 `setParam()` 参数手势失败收尾补强通过:
@@ -1762,7 +1764,7 @@ cargo test -p vesty-ui-wry bootstrap_script_registers_host_subscriptions
 
 新增行为:
 
-- `@vesty/plugin-ui` 与 wry bootstrap 的 `setParam()` 在 `param.begin` 成功后会保证尝试发送 `param.end`。
+- `vesty-plugin-ui` 与 wry bootstrap 的 `setParam()` 在 `param.begin` 成功后会保证尝试发送 `param.end`。
 - 如果 `param.perform` 失败，`setParam()` 仍会尽力发送 `param.end`，最终优先 reject 原始 perform error，降低 host 侧参数 edit gesture 悬空风险。
 - 如果 `param.begin` 失败，则不会发送 perform/end，保持未知参数或权限错误的快速失败语义。
 
@@ -1870,18 +1872,18 @@ cargo clippy -p vesty-vst3 --all-targets --features 'vst3-bindings wry-ui' -- -D
 - `vesty-vst3` 的 wry bridge endpoint 现在使用带 generation 的共享 bridge snapshot。active WebView runtime 会在每次 IPC / `event.flush` 前吸收 controller `setState()` / `setComponentState()` 恢复的 bridge snapshot；runtime 写回 snapshot 时如果发现 controller 已有更新 generation，会跳过写回，避免覆盖宿主恢复状态。
 - 新增测试覆盖纯 bridge host snapshot restore，以及 VST3 controller 在 UI 已打开、已订阅 `state.changed` 时，通过 `event.flush` 将恢复后的 config/UI state 推给现有 UI runtime，并确认后续 `snapshot.get` 返回同一份恢复状态。
 
-本次 2026-06-08 针对 `@vesty/plugin-ui` protocol package exports 并通过:
+本次 2026-06-08 针对 `vesty-plugin-ui` protocol package exports 并通过:
 
 ```bash
 cargo run --quiet -p vesty-cli -- export-types --out target/vesty-plugin-ui-protocol
-npm run --workspace @vesty/plugin-ui typecheck
-npm run --workspace @vesty/plugin-ui test
+npm run --workspace vesty-plugin-ui typecheck
+npm run --workspace vesty-plugin-ui test
 npm test
-node --input-type=module -e 'const mod = await import("@vesty/plugin-ui/protocol"); if (typeof mod !== "object") throw new Error("protocol subpath import failed"); console.log("protocol subpath runtime import ok");'
+node --input-type=module -e 'const mod = await import("vesty-plugin-ui/protocol"); if (typeof mod !== "object") throw new Error("protocol subpath import failed"); console.log("protocol subpath runtime import ok");'
 mkdir -p target/typecheck-smoke
-printf '%s\n' 'import type { BridgeReadyPayload, PluginSnapshot } from "@vesty/plugin-ui/protocol";' 'const snapshot: PluginSnapshot = { revision: 1, paramsRevision: 0, configRevision: 1, uiRevision: 0, config: { theme: "dark" }, uiState: null };' 'const ready: BridgeReadyPayload = { protocolVersion: 1, instanceId: "i", editorSessionId: "e", devMode: true, pluginName: "P", vendor: "V", capabilities: { paramGestures: true, paramFormatParse: true, stateConfig: true, subscriptions: true, meterStream: true, reliableEvents: true, diagnostics: true }, params: [], snapshot };' 'void ready;' > target/typecheck-smoke/plugin-ui-protocol-import.ts
+printf '%s\n' 'import type { BridgeReadyPayload, PluginSnapshot } from "vesty-plugin-ui/protocol";' 'const snapshot: PluginSnapshot = { revision: 1, paramsRevision: 0, configRevision: 1, uiRevision: 0, config: { theme: "dark" }, uiState: null };' 'const ready: BridgeReadyPayload = { protocolVersion: 1, instanceId: "i", editorSessionId: "e", devMode: true, pluginName: "P", vendor: "V", capabilities: { paramGestures: true, paramFormatParse: true, stateConfig: true, subscriptions: true, meterStream: true, reliableEvents: true, diagnostics: true }, params: [], snapshot };' 'void ready;' > target/typecheck-smoke/plugin-ui-protocol-import.ts
 npx tsc --strict --noEmit --target ES2022 --module ES2022 --moduleResolution Bundler target/typecheck-smoke/plugin-ui-protocol-import.ts
-npm pack --workspace @vesty/plugin-ui --dry-run --json
+npm pack --workspace vesty-plugin-ui --dry-run --json
 rm -rf target/vesty-plugin-ui-protocol-check
 cargo run --quiet -p vesty-cli -- export-types --out target/vesty-plugin-ui-protocol-check
 for f in $(find target/vesty-plugin-ui-protocol-check/typescript -type f | sort); do rel=${f#target/vesty-plugin-ui-protocol-check/typescript/}; diff -q "$f" "packages/plugin-ui/src/$rel" >/dev/null || { echo "protocol drift: $rel"; exit 1; }; done
@@ -1892,7 +1894,7 @@ cargo test -p vesty-cli protocol
 新增行为:
 
 - `packages/plugin-ui/src/protocol` 与 `src/serde_json` 现在保存由 `vesty-ipc::export_protocol_bindings()` 生成的 TypeScript 协议类型，包括 `BridgePacket`、`BridgeReadyPayload`、`BridgeHelloPayload`、`BridgeDiagnosticsSnapshot`、`PluginSnapshot`、`ParamChangedEvent`、`RtLogRecord` 和 `ParamSpec`。
-- `@vesty/plugin-ui` package manifest 新增 `exports["./protocol"]` 和 `exports["./protocol/*"]`，发布包只包含 `dist`，让 UI 开发者可以从 `@vesty/plugin-ui/protocol` 引入精确协议类型。
+- `vesty-plugin-ui` package manifest 新增 `exports["./protocol"]` 和 `exports["./protocol/*"]`，发布包只包含 `dist`，让 UI 开发者可以从 `vesty-plugin-ui/protocol` 引入精确协议类型。
 
 本次 2026-06-09 针对 JSBridge subscription topic 校验:
 
@@ -1901,8 +1903,8 @@ cargo fmt --all --check
 cargo check -p vesty-bridge -j1
 cargo test -p vesty-bridge subscription -- --nocapture
 cargo test -p vesty-bridge bridge_runtime -- --nocapture
-npm --workspace @vesty/plugin-ui run typecheck
-npm --workspace @vesty/plugin-ui test
+npm --workspace vesty-plugin-ui run typecheck
+npm --workspace vesty-plugin-ui test
 npm test
 cargo check -p vesty-ui-wry --features wry-backend -j1
 cargo test -p vesty-ui-wry --features wry-backend bootstrap_script_registers_host_subscriptions -- --nocapture
@@ -1912,10 +1914,10 @@ cargo test -p vesty-ui-wry --features wry-backend bootstrap_script_registers_hos
 
 - `vesty-bridge` 的 `subscription.add` / `subscription.remove` 共用 `validate_subscription_topic()`，除原有长度上限外，现在拒绝空 topic 和 ASCII/control 字符。
 - 无效 topic 会返回 `validation_error`，不会写入 subscription table，也不会影响 meter/latest event/filter 状态。
-- `@vesty/plugin-ui` 的 `subscribe()` 现在在本地 listener 表 mutation 和 `window.ipc.postMessage` 前同步拒绝非字符串 topic、空 topic、超过 128 UTF-8 bytes 的 topic 和控制字符 topic；测试覆盖无效 topic 不会发送 `subscription.add`。
+- `vesty-plugin-ui` 的 `subscribe()` 现在在本地 listener 表 mutation 和 `window.ipc.postMessage` 前同步拒绝非字符串 topic、空 topic、超过 128 UTF-8 bytes 的 topic 和控制字符 topic；测试覆盖无效 topic 不会发送 `subscription.add`。
 - `vesty-ui-wry` 注入 bootstrap 的 fallback `subscribe()` 使用同一套 topic 预校验，避免不加载 SDK 的 Web UI 绕过前端 guard；bootstrap 文本测试固定 `assertSubscriptionTopic`、`TextEncoder` byte-length 和 `validation_error` 行为存在。
-- `vesty-ui-wry` 注入 bootstrap 的 fallback `ready()` 现在和 `@vesty/plugin-ui` 一样校验 ready payload shape，覆盖 protocol version、metadata、capabilities、snapshot revisions、ParamSpec schema 和 MIDI mapping schema；畸形 ready payload 会以 `validation_error` 拒绝并允许 retry。
-- `@vesty/plugin-ui` 和 `vesty-ui-wry` 注入 bootstrap 的 Promise 型 state/param API 现在会在发送 IPC 前做轻量预校验: config key、baseRevision、param id、normalized finite number、optional gestureId、param parse text、undefined config/state value。校验失败返回 rejected Promise，错误为 non-retryable `validation_error`；SDK 测试覆盖畸形 state/param command 不会触发 `window.ipc.postMessage`。
+- `vesty-ui-wry` 注入 bootstrap 的 fallback `ready()` 现在和 `vesty-plugin-ui` 一样校验 ready payload shape，覆盖 protocol version、metadata、capabilities、snapshot revisions、ParamSpec schema 和 MIDI mapping schema；畸形 ready payload 会以 `validation_error` 拒绝并允许 retry。
+- `vesty-plugin-ui` 和 `vesty-ui-wry` 注入 bootstrap 的 Promise 型 state/param API 现在会在发送 IPC 前做轻量预校验: config key、baseRevision、param id、normalized finite number、optional gestureId、param parse text、undefined config/state value。校验失败返回 rejected Promise，错误为 non-retryable `validation_error`；SDK 测试覆盖畸形 state/param command 不会触发 `window.ipc.postMessage`。
 - SDK 顶层 `BridgePacket<T>` 继承生成的 `ProtocolBridgePacket` 并只放宽 `payload` 泛型；`BridgeError`、`PluginSnapshot`、`BridgeReadyPayload` 等常用类型改为直接引用/重导出 Rust 生成类型。
 - 新增 `protocol-files.test.mjs`，确认 `npm run build` 后 `dist/index.d.ts`、`dist/protocol/index.d.ts` 和关键协议 declaration files 已输出。
 - 新增 `vesty-cli` 单元测试 `plugin_ui_protocol_sources_match_generated_export`，每次从 Rust 源临时导出 TypeScript 协议类型，并逐文件比较 `packages/plugin-ui/src/protocol` / `src/serde_json`，把此前手动 shell drift check 固化为仓库测试。
@@ -1949,7 +1951,7 @@ cargo check
 本次 2026-06-08 针对 JSBridge ready handshake 幂等并通过:
 
 ```bash
-npm run --workspace @vesty/plugin-ui test
+npm run --workspace vesty-plugin-ui test
 npm test
 npm run typecheck
 cargo fmt --all --check
@@ -1959,7 +1961,7 @@ cargo clippy -p vesty-ui-wry --all-targets -- -D warnings
 
 新增行为:
 
-- `@vesty/plugin-ui` 的 `createBridge()` 现在缓存 `readyPromise` 和 ready payload。并发 `ready()` 只发送一次 `bridge.hello`，readyAck 成功后后续 `ready()` 直接返回同一个 payload；失败时清空 promise，允许重试。
+- `vesty-plugin-ui` 的 `createBridge()` 现在缓存 `readyPromise` 和 ready payload。并发 `ready()` 只发送一次 `bridge.hello`，readyAck 成功后后续 `ready()` 直接返回同一个 payload；失败时清空 promise，允许重试。
 - wry bootstrap 注入的 `window.__VESTY__.ready()` 使用同样的 ready promise / payload cache，保持内置全局 bridge 与 npm SDK 行为一致。
 - `packages/plugin-ui/tests/bridge.test.mjs` 新增并发 ready 测试，确认第二次并发调用不追加 packet，ready 完成后的第三次调用也不重新发送 hello；同时覆盖 unsupported protocol 和 hello timeout 后清空 ready promise、允许下一次 ready 重试成功。
 - `vesty-ui-wry` bootstrap string test 新增 ready cache 断言。
@@ -1970,7 +1972,7 @@ cargo clippy -p vesty-ui-wry --all-targets -- -D warnings
 cargo test -p vesty-params
 cargo test -p vesty-ipc exports_protocol_types_and_json_schema
 cargo test -p vesty-cli plugin_ui_protocol_sources_match_generated_export
-npm run --workspace @vesty/plugin-ui test
+npm run --workspace vesty-plugin-ui test
 cargo fmt --all --check
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
@@ -2657,9 +2659,9 @@ cargo run -p vesty-cli -- publish-plan --check --out target/publish-plan-smoke.j
 - Rust workspace metadata 已从 `https://example.com/vesty` 占位 repository 改为真实 repository/homepage 字段，并补齐 authors、keywords 和 crates.io categories。
 - 所有 `crates/*` manifest 现在都有 description、workspace authors/categories/homepage/keywords 和 `readme = "../../README.md"`；`examples/*` 已显式 `publish = false`。
 - 三个 example plugin 的 `PluginInfo` 已移除 `https://example.com/vesty` / `dev@example.com` 占位值，统一使用项目 URL 和空 email；`workspace_packages_have_release_metadata` 会防止示例 metadata 回退。
-- `packages/plugin-ui`、`packages/react`、`packages/vue`、`packages/svelte` 已补 description/license/repository/homepage/keywords；React/Vue/Svelte 适配包也补齐 `exports` 和 `files = ["dist"]`。
+- `packages/plugin-ui` 已补 description/license/repository/homepage/keywords，并通过 package `exports` 暴露 root、protocol、React、Vue 与 Svelte 入口。
 - 新增 `workspace_packages_have_release_metadata` 单元测试，防止 README 示例 API 漂移、占位 repository、缺 readme/license、示例可发布或 JS package metadata 退化。
-- `npm pack --workspaces --dry-run --json` 通过，确认四个 JS package 的发布包边界只包含 `dist` 和 `package.json`。
+- `npm pack --workspaces --dry-run --json` 通过，确认唯一的 `vesty-plugin-ui` 发布包边界只包含 `dist` 和 `package.json`。
 - `cargo package -p vesty-params|vesty-build|vesty-macros|vesty-vst3-sys --allow-dirty --no-verify` 通过，验证无内部未发布依赖的叶子 crate 已可打包。`cargo package -p vesty` 仍会因为 `vesty-bridge` 等内部 crates 尚未发布到 crates.io 而失败；这属于多 crate workspace 的发布顺序问题，不是 metadata/readme/license 缺失。
 - 新增 `vesty publish-plan`，alias 为 `vesty release-order`。命令从 Cargo metadata 生成 publishable workspace crates 的 dependency-safe 顺序，跳过 `publish = false` 的 examples，并在可发布 crate 依赖 private workspace package 时返回非零。`--out <path>` 会写入规范 JSON 并立即复用 release gate validator；`--check --out <path>` 只复验已有 report。
 - 当前 `publish-plan --format json` 输出的 crate 顺序为: `vesty-params`、`vesty-macros`、`vesty-vst3-sys`、`vesty-build`、`vesty-core`、`vesty-ipc`、`vesty-rt`、`vesty-ui`、`vesty-cli`、`vesty-bridge`、`vesty-ui-wry`、`vesty-vst3`、`vesty`。
@@ -2684,7 +2686,7 @@ cargo run -p vesty-cli -- new target/vesty-new-smoke.<tmp>/readme-smoke --ui non
 
 - 有 UI 的脚手架模板现在会在生成的 `ui/package.json` 写入 `"private": true`，明确该子工程是插件 UI asset app，而不是 npm library package。
 - `ui_package_template_can_use_local_plugin_ui_path` 和 `ui_templates_emit_framework_specific_files` 已覆盖默认发布依赖、本地 `file:` 依赖以及 React/Vue/Svelte 模板均保持 `private: true`。
-- 真实 `vesty new ... --ui vanilla --vesty-path crates/vesty --plugin-ui-path packages/plugin-ui` smoke 已确认生成的 `ui/package.json` 同时包含 `private: true` 和本地 `@vesty/plugin-ui` file dependency。
+- 真实 `vesty new ... --ui vanilla --vesty-path crates/vesty --plugin-ui-path packages/plugin-ui` smoke 已确认生成的 `ui/package.json` 同时包含 `private: true` 和本地 `vesty-plugin-ui` file dependency。
 - `.agents/03-module-design.md` 中的 public API 示例已移除旧 `example.com`/`dev@example.com` 占位 contact metadata，保持与 README 和 examples 的当前风格一致。
 - `vesty-ui-wry` 已开启 `#![deny(clippy::undocumented_unsafe_blocks)]`，并为平台 parent handle、WebView IPC 回推指针和测试环境变量 unsafe block 补齐 `SAFETY:` 注释；`cargo clippy -p vesty-ui-wry --all-targets --features wry-backend -- -D warnings` 通过。
 - `vesty-vst3` crate root 和 `src/bindings_impl.rs` 已显式开启 `#![deny(unsafe_op_in_unsafe_fn)]` 与 `#![deny(clippy::undocumented_unsafe_blocks)]`；`cargo fix --workspace --allow-dirty --allow-no-vcs --all-targets` 迁移了 2024 unsafe-op blocks，随后为 production COM helper、fake COM tests 和 raw callback tests 补齐 `SAFETY:` 注释。`cargo clippy --workspace --all-targets -- -D warnings` 和 `cargo test --workspace` 通过。
@@ -2717,7 +2719,7 @@ cargo test -p vesty-cli release_evidence_templates_do_not_count_as_pass_or_overw
 
 新增行为:
 
-- `release-check` 新增 `--npm-pack-report <path>`，读取 `npm pack --workspaces --dry-run --json` 输出，验证 `@vesty/plugin-ui`、`@vesty/react`、`@vesty/vue` 和 `@vesty/svelte` 四个 package 全部存在。
+- `release-check` 新增 `--npm-pack-report <path>`，读取 `npm pack --workspaces --dry-run --json` 输出，验证 `vesty-plugin-ui`、`vesty-plugin-ui/react`、`vesty-plugin-ui/vue` 和 `vesty-plugin-ui/svelte` 四个 package 全部存在。
 - `vesty npm-pack --out <path>` 现在会运行 npm workspace dry-run pack，写入规范 JSON，并立即复用同一套 release-check validator；`vesty npm-pack --check --out <path>` 可复验已有 artifact。
 - npm pack report gate 会验证每个 package 有非空 version、`.tgz` filename、`package.json`、`dist/**` 文件，并拒绝 `src/**`、`tests/**`、绝对路径、`..` 或其它非发布边界文件进入 packed tarball。
 - `--release-evidence-dir` 会自动发现 `npm-pack/npm-pack.json` 或根目录 `npm-pack.json`；`--require-release-artifacts` 会要求该 evidence 存在并有效。
@@ -2768,11 +2770,11 @@ rtk cargo run -p vesty-cli -- release-check --format json --strict --dependency-
 - `ci_release_check_artifacts_reject_duplicate_or_forged_invariant_checks` 覆盖重复 check、伪造 host coverage、伪造 binding baseline 和模糊 protocol skip；测试夹具更新为当前真实 `daw matrix` check 名，同时 gate 兼容旧 `daw smoke matrix` 名称。
 - 本地验证通过: `ci_release_check_artifacts` 6 passed、`import_ci` 2 passed、`release_evidence` 10 passed、`release_check` 33 passed、workspace Rust tests 470 passed、workspace clippy no issues、JS workspace tests passed。strict `release-check` 仍按预期失败在真实 DAW/platform/CI/validator/signing/notarization evidence 缺失；本地 invariant 中 host profiles、protocol snapshot、VST3 binding baseline 和 dependency latest baseline 为 ok。
 
-本次 2026-06-08 针对 `@vesty/plugin-ui` reload/close stress 补强:
+本次 2026-06-08 针对 `vesty-plugin-ui` reload/close stress 补强:
 
 ```bash
-npm --workspace @vesty/plugin-ui test
-npm --workspace @vesty/plugin-ui run typecheck
+npm --workspace vesty-plugin-ui test
+npm --workspace vesty-plugin-ui run typecheck
 cargo test -p vesty-ui-wry bootstrap_script_registers_host_subscriptions -- --nocapture
 cargo clippy -p vesty-ui-wry --all-targets -- -D warnings
 ```
@@ -2860,7 +2862,7 @@ cargo test -p vesty-bridge
 cargo clippy -p vesty-bridge --all-targets -- -D warnings
 cargo test -p vesty-vst3 --features 'vst3-bindings wry-ui' factory_rejects_controller_with_invalid_param_schema -- --nocapture
 cargo clippy -p vesty-vst3 --features 'vst3-bindings wry-ui' --all-targets -- -D warnings
-npm --workspace @vesty/plugin-ui test
+npm --workspace vesty-plugin-ui test
 ```
 
 新增行为:
@@ -2868,7 +2870,7 @@ npm --workspace @vesty/plugin-ui test
 - `BridgeRuntime::new()` / `BridgeRuntime::try_new()` 会在建立 ready snapshot store 和参数 ID map 前调用 `validate_param_specs()` 并返回 `ParamSpecError`，拒绝重复/非法参数 schema，不再通过公共 constructor panic。
 - 新增 `bridge_runtime_try_new_rejects_invalid_param_schema`，覆盖 duplicate ID 和 empty ID ready payload 被 `vesty-bridge` 拒绝。
 - wry/VST3 bridge endpoint 改为使用 `try_new()`；正常情况下无效 schema 已在 VST3 controller 创建前被挡住，如果未来路径绕过 controller gate，IPC 会返回 `validation_error`，不会在 WebView attach 路径 panic。
-- `@vesty/plugin-ui` 的 `ready()` 新增 ready payload shape 校验，覆盖 protocol metadata、capabilities、snapshot revision 字段和 `ParamSpec` schema；畸形 payload 会以 non-retryable `validation_error` 拒绝，清空 ready promise 后允许重试。
+- `vesty-plugin-ui` 的 `ready()` 新增 ready payload shape 校验，覆盖 protocol metadata、capabilities、snapshot revision 字段和 `ParamSpec` schema；畸形 payload 会以 non-retryable `validation_error` 拒绝，清空 ready promise 后允许重试。
 - `.agents/12-jsbridge-design.md` 已同步说明 ready payload 参数 schema 在 Rust runtime 建表前校验，并记录 JS SDK 的运行时校验边界。
 
 本次 2026-06-08 针对基础 MIDI event 覆盖补强:
@@ -2897,7 +2899,7 @@ cargo test -p vesty-params param_midi -- --nocapture
 cargo test -p vesty-params validates_param_specs -- --nocapture
 cargo test -p vesty-vst3 --features 'vst3-bindings wry-ui' midi -- --nocapture
 cargo run -p vesty-cli -- export-types --out target/vesty-protocol --check
-npm --workspace @vesty/plugin-ui test
+npm --workspace vesty-plugin-ui test
 ```
 
 新增行为:
@@ -2907,7 +2909,7 @@ npm --workspace @vesty/plugin-ui test
 - `ParamSpec`、`FloatParam`、`BoolParam` 和 `ChoiceParam` 新增 `.with_midi_mapping()`、`.with_midi_cc()` 和 `.with_channel_midi_cc()` builder；`validate_param_specs()` 会拒绝非法 controller、非法 channel 和同一参数内重复 mapping。
 - `VestyController` 现在实现 `IMidiMapping`，host 查询 main bus `0` 时会按 `midi_mappings` 返回第一个 opt-in、automatable、非 read-only 参数的 VST3 `ParamID`；channel-specific mapping 只匹配对应 MIDI channel，read-only 参数不会被返回。
 - fake COM 测试 `controller_exposes_opt_in_midi_mapping` 覆盖全 channel CC、指定 channel CC、pitch bend、read-only mapping、非 main bus、负 controller/channel 和 null out pointer。
-- `@vesty/plugin-ui` 的 ready payload 校验现在要求每个 `ParamSpec` 都包含 `midiMappings`，并校验 controller/channel 范围和同一参数内重复 mapping；无效 payload 会以 `validation_error` 拒绝并允许 retry。
+- `vesty-plugin-ui` 的 ready payload 校验现在要求每个 `ParamSpec` 都包含 `midiMappings`，并校验 controller/channel 范围和同一参数内重复 mapping；无效 payload 会以 `validation_error` 拒绝并允许 retry。
 - `.agents/04-vst3-adapter.md`、`.agents/08-developer-guide.md` 和 `.agents/12-jsbridge-design.md` 已同步记录参数 MIDI mapping、wire schema 和 JS ready 校验。
 
 本次 2026-06-08 针对 VST3 stable `ParamID` 补强:
@@ -2974,7 +2976,7 @@ cargo test -p vesty-vst3 --features 'vst3-bindings wry-ui' stable_vst3_param_ids
 
 - `wry 0.55.1`、`vst3 0.3.0`、`raw-window-handle 0.6.2`、`rtrb 0.3.4`、`serde 1.0.228`、`serde_json 1.0.150`、`ts-rs 12.0.1`、`clap 4.6.1` 仍为 crates.io 当前返回版本。
 - workspace baseline 同步覆盖 `schemars 1.2.1`、`toml 1.1.2`、`sha2 0.11.0`、`tempfile 3.27.0`、`thiserror 2.0.18`。
-- `@vesty/plugin-ui`、`@vesty/react`、`@vesty/vue`、`@vesty/svelte` 的 TypeScript devDependency 已升级到 `^6.0.3`，`package-lock.json` installed `typescript` 为 `6.0.3`。
+- `vesty-plugin-ui`、`vesty-plugin-ui/react`、`vesty-plugin-ui/vue`、`vesty-plugin-ui/svelte` 的 TypeScript devDependency 已升级到 `^6.0.3`，`package-lock.json` installed `typescript` 为 `6.0.3`。
 - 新增 `vesty dependency-baseline`，离线校验当前 workspace 的 Cargo baseline、VST3 SDK/binding baseline、JS TypeScript range、React/Vue/Svelte adapter devDependency range 和 lockfile installed version；CI 新增 `dependency-baseline` job 并上传 `vesty-dependency-baseline` artifact。该命令防止仓库版本漂移，但不替代 release 前联网 registry/npm/Steinberg 最新性复核。
 
 本次 2026-06-09 针对 final protocol snapshot release gate 硬化:
@@ -3368,8 +3370,8 @@ cargo test -p vesty-bridge state_ -- --nocapture
 cargo test -p vesty-bridge param_ -- --nocapture
 cargo test -p vesty-bridge subscription -- --nocapture
 cargo test -p vesty-ui-wry --features wry-backend bootstrap_script_registers_host_subscriptions -- --nocapture
-npm --workspace @vesty/plugin-ui run typecheck
-npm --workspace @vesty/plugin-ui test
+npm --workspace vesty-plugin-ui run typecheck
+npm --workspace vesty-plugin-ui test
 ```
 
 新增行为:
@@ -3377,7 +3379,7 @@ npm --workspace @vesty/plugin-ui test
 - `BridgeRuntime` 新增 shared payload helpers，并将 `state.setConfig` / `state.setUiState`、`param.begin` / `param.perform` / `param.end` / `param.format` / `param.parse` 全部收口到 native authoritative schema parsing。
 - State command 会区分 missing `baseRevision`、wrong-type `baseRevision`、missing/wrong-type config key、missing value；`baseRevision` 必须是非负整数，`value: null` 被保留为合法 JSON 写入。
 - Param command 会区分 missing/wrong-type/empty/control-character parameter id、missing/wrong-type normalized、missing/wrong-type parse text、wrong-type/empty/too-long/control-character optional `gestureId`；无效 payload 不会写入 pending gesture queue。
-- `@vesty/plugin-ui` 和 `vesty-ui-wry` bootstrap 仍保留前端预校验，但 Rust bridge runtime 现在在 native IPC 边界用同一语义作为最终裁决源。
+- `vesty-plugin-ui` 和 `vesty-ui-wry` bootstrap 仍保留前端预校验，但 Rust bridge runtime 现在在 native IPC 边界用同一语义作为最终裁决源。
 
 本次 2026-06-09 针对 Rust native JSBridge `bridge.readyAck` protocol/order guard 补强:
 
@@ -3389,8 +3391,8 @@ cargo test -p vesty-bridge hello -- --nocapture
 cargo test -p vesty-bridge subscription -- --nocapture
 cargo test -p vesty-bridge -- --nocapture
 cargo test -p vesty-ui-wry --features wry-backend bootstrap_script_registers_host_subscriptions -- --nocapture
-npm --workspace @vesty/plugin-ui run typecheck
-npm --workspace @vesty/plugin-ui test
+npm --workspace vesty-plugin-ui run typecheck
+npm --workspace vesty-plugin-ui test
 ```
 
 新增行为:
@@ -3398,35 +3400,35 @@ npm --workspace @vesty/plugin-ui test
 - `BridgeRuntime` 现在要求 `bridge.readyAck` 必须发生在成功 `bridge.hello` 之后；提前 ack 返回 non-retryable `permission_denied`，不会把 runtime 标记为 ready。
 - 通过顺序 gate 后，runtime 继续校验 `bridge.readyAck` payload 的 `protocolVersion` 字段: 缺失或 wrong type 返回 non-retryable `validation_error`，不支持版本返回 `unsupported_version`。
 - 无效 readyAck 不会把 `ready_acknowledged()` 置为 true，避免旧 UI、畸形 bootstrap 或测试 harness 绕过 JS ready response guard 后让 native runtime 进入半 ready 状态；旧 diagnostics 测试也已改为真实 hello -> readyAck 流程。
-- `@vesty/plugin-ui` 与 `vesty-ui-wry` 仍从 ready payload 派生并发送 `protocolVersion`，正常 hello/readyAck 流程由 Rust、wry bootstrap 和 JS SDK 回归测试覆盖。
+- `vesty-plugin-ui` 与 `vesty-ui-wry` 仍从 ready payload 派生并发送 `protocolVersion`，正常 hello/readyAck 流程由 Rust、wry bootstrap 和 JS SDK 回归测试覆盖。
 
 本次 2026-06-09 针对 JSBridge param begin `gestureId` 贯穿补强:
 
 ```bash
 cargo fmt --all --check
 cargo test -p vesty-ui-wry --features wry-backend bootstrap_script_registers_host_subscriptions -- --nocapture
-npm --workspace @vesty/plugin-ui test
-npm --workspace @vesty/plugin-ui run typecheck
-npm --workspace @vesty/react test
-npm --workspace @vesty/vue test
-npm --workspace @vesty/svelte test
+npm --workspace vesty-plugin-ui test
+npm --workspace vesty-plugin-ui run typecheck
+npm --workspace vesty-plugin-ui/react test
+npm --workspace vesty-plugin-ui/vue test
+npm --workspace vesty-plugin-ui/svelte test
 npm test
 npm run typecheck
 ```
 
 新增行为:
 
-- `@vesty/plugin-ui` 的 `beginParamEdit(id, gestureId?)` 现在与 `performParamEdit()` / `endParamEdit()` 一样支持 optional gesture token，并在发送前复用 `gestureId` 非空、最长 128 bytes、无控制字符的预校验。
+- `vesty-plugin-ui` 的 `beginParamEdit(id, gestureId?)` 现在与 `performParamEdit()` / `endParamEdit()` 一样支持 optional gesture token，并在发送前复用 `gestureId` 非空、最长 128 bytes、无控制字符的预校验。
 - `vesty-ui-wry` 注入 bootstrap 的 fallback `beginParamEdit(id, gestureId?)` 同步支持并校验 gesture token，发送 `param.begin` payload `{ id, gestureId }`。
 - `setParam(id, normalized, gestureId?)` 会把同一个 optional gesture token 贯穿 `param.begin` -> `param.perform` -> `param.end`，并在发送前复用同一套 gesture token 预校验。
-- `@vesty/react`、`@vesty/vue` 和 `@vesty/svelte` 的 param edit helper API 已对齐为 `begin(gestureId?)` 与 `set(normalized, gestureId?)`；Vue/Svelte adapter 测试覆盖 begin/perform/set/end 都会把同一个 token 转发到底层 bridge。
-- `@vesty/plugin-ui` 测试覆盖 `beginParamEdit("gain", "drag-1")` 发出 `param.begin` 且 payload 带 `gestureId`，并覆盖 begin 阶段非法 gesture token 不会触发 IPC。
+- `vesty-plugin-ui/react`、`vesty-plugin-ui/vue` 和 `vesty-plugin-ui/svelte` 的 param edit helper API 已对齐为 `begin(gestureId?)` 与 `set(normalized, gestureId?)`；Vue/Svelte adapter 测试覆盖 begin/perform/set/end 都会把同一个 token 转发到底层 bridge。
+- `vesty-plugin-ui` 测试覆盖 `beginParamEdit("gain", "drag-1")` 发出 `param.begin` 且 payload 带 `gestureId`，并覆盖 begin 阶段非法 gesture token 不会触发 IPC。
 
 本次 2026-06-09 针对 JSBridge generic `request(type, payload)` type validation 补强:
 
 ```bash
-npm --workspace @vesty/plugin-ui test
-npm --workspace @vesty/plugin-ui run typecheck
+npm --workspace vesty-plugin-ui test
+npm --workspace vesty-plugin-ui run typecheck
 cargo test -p vesty-ui-wry --features wry-backend bootstrap_script_registers_host_subscriptions -- --nocapture
 cargo fmt --all --check
 npm test
@@ -3436,7 +3438,7 @@ cargo test -p vesty-ui-wry --features wry-backend -- --nocapture
 
 新增行为:
 
-- `@vesty/plugin-ui` 新增 shared `assertRequestType()`，所有 JS SDK request 在进入 `post()` 前校验 packet type；必须是 string、非空、最长 128 UTF-8 bytes、不能包含控制字符。
+- `vesty-plugin-ui` 新增 shared `assertRequestType()`，所有 JS SDK request 在进入 `post()` 前校验 packet type；必须是 string、非空、最长 128 UTF-8 bytes、不能包含控制字符。
 - `vesty-ui-wry` 注入 bootstrap 的 `window.__VESTY_INTERNAL__.request(type, lane, payload)` 使用同一套 type 校验，保护不加载 npm SDK、直接使用 fallback `window.__VESTY__` 的页面。
 - 无效 generic `bridge.request(type, payload)` 会抛出 non-retryable `validation_error`，不会创建 pending request、启动 timer 或调用 `window.ipc.postMessage`；后续合法 request 仍可正常发送和 resolve。
 - Node 回归测试覆盖 non-string、empty、ASCII/UTF-8 超长和 control-character request type；wry bootstrap 文本测试固定 `MAX_BRIDGE_PACKET_TYPE_BYTES`、`assertRequestType(type)` 和对应错误语义存在。
@@ -3470,7 +3472,7 @@ cargo search serde_json --limit 1
 cargo search ts-rs --limit 1
 cargo search clap --limit 1
 npm outdated --workspaces --long || true
-npm install --workspace @vesty/plugin-ui --workspace @vesty/react --workspace @vesty/vue --workspace @vesty/svelte typescript@latest --save-dev
+npm install --workspace vesty-plugin-ui --workspace vesty-plugin-ui/react --workspace vesty-plugin-ui/vue --workspace vesty-plugin-ui/svelte typescript@latest --save-dev
 npm test
 npm run typecheck
 cargo fmt --all --check
@@ -3484,7 +3486,7 @@ cargo run -p vesty-cli -- dependency-baseline --latest --check --out target/depe
 
 新增行为:
 
-- `@vesty/plugin-ui`、`@vesty/react`、`@vesty/vue`、`@vesty/svelte` 的 `typescript` devDependency 已升级为 `^6.0.3`，`package-lock.json` 中 `node_modules/typescript` 为 `6.0.3`。
+- `vesty-plugin-ui`、`vesty-plugin-ui/react`、`vesty-plugin-ui/vue`、`vesty-plugin-ui/svelte` 的 `typescript` devDependency 已升级为 `^6.0.3`，`package-lock.json` 中 `node_modules/typescript` 为 `6.0.3`。
 - `vesty-cli` 新增 `vesty dependency-baseline`，生成 deterministic JSON report，离线校验全部当前外部 Cargo workspace dependencies、VST3 SDK/binding baseline、四个 JS package 的 TypeScript range、React/Vue/Svelte adapter devDependency range，以及 lockfile installed versions。
 - `vesty dependency-baseline --check --out <report>` 会复验已有 report 与当前 workspace 是否一致；report drift、missing dependency 或版本不匹配都会非零退出。
 - `vesty dependency-baseline --latest --out <report>` 会显式联网查询 crates.io / npm registry latest 并把 registry latest checks 加入 report；Rust latest 查询现在 `cargo search` 优先、`cargo info` fallback，本次真实运行中 `cargo search ts-rs` 返回 crates.io 500，但 fallback 到 `cargo info ts-rs` 后仍确认 `ts-rs 12.0.1`。本次真实运行全绿，覆盖所有当前外部 workspace Rust dependencies，并确认 npm `typescript 6.0.3`、`react 19.2.7`、`@types/react 19.2.17`、`vue 3.5.38` 和 `svelte 5.56.3`。`toml` registry latest 以 `1.1.2+spec-1.1.0` 校验，Cargo manifest 仍保留 `1.1.2` 以避免 SemVer metadata warning。
@@ -3805,7 +3807,7 @@ cargo check --manifest-path target/template-path-name-smoke/my-gain/Cargo.toml
 - Web UI 模板现在跟随 plugin kind 绑定 starter 主参数: effect UI 继续使用 `gain`，instrument UI 使用 `volume`。`web-ui-instrument` 生成的 React UI 会调用 `useVestyParamEdit("volume")`，不再把 gesture 发给不存在的 `gain` 参数；全量 starter 测试会检查 UI 源码包含对应主参数并拒绝 instrument UI 中残留的 `gain` bridge 调用。
 - Web UI 模板现在用 `bridge.ready()` 返回的 `BridgeReadyPayload.params[].defaultNormalized` 初始化 starter slider，并订阅 `param.changed` 同步 host/controller/UI 确认后的参数值；`PluginSnapshot` 只用于 config/ui state revision，不作为当前参数值容器。
 - 本机 smoke 已用当前 workspace path 生成全部 7 个内置 starter 临时项目，并分别通过独立 `cargo check`。
-- 5 个带 Web UI 的 starter (`web-ui-param-demo`、`vanilla-ui-param-demo`、`vue-ui-param-demo`、`svelte-ui-param-demo`、`web-ui-instrument`) 均通过生成项目内的 `npm install`、`npm run build` 和 `npm run typecheck`，验证 `@vesty/plugin-ui` 本地 file dependency、React/Vue/Svelte adapter file dependency、Vite build、TypeScript/template checker 配置、effect/instrument UI 参数绑定、ready default 初始化和 `param.changed` 订阅可用。
+- 5 个带 Web UI 的 starter (`web-ui-param-demo`、`vanilla-ui-param-demo`、`vue-ui-param-demo`、`svelte-ui-param-demo`、`web-ui-instrument`) 均通过生成项目内的 `npm install`、`npm run build` 和 `npm run typecheck`，验证 `vesty-plugin-ui` 本地 file dependency、React/Vue/Svelte adapter file dependency、Vite build、TypeScript/template checker 配置、effect/instrument UI 参数绑定、ready default 初始化和 `param.changed` 订阅可用。
 - 该 smoke 证明内置模板的开发者起步路径可用；第三方模板 registry、远程模板下载、模板签名/缓存和外部 DAW 加载仍是后续工作，不作为当前 release evidence。
 
 追加 2026-06-10 针对 Web UI starter ready 参数默认值 + `param.changed` 同步复跑:
@@ -3934,7 +3936,7 @@ cargo run -p vesty-cli -- export-types --out target/vesty-protocol-audit --check
 
 - `cargo test --workspace -j1` 通过，当前覆盖 430 个 Rust unit/doc tests，包括 `vesty` facade、bridge/build/cli/core/ipc/macros/params/rt/ui-wry/vst3/vst3-sys 和三个 examples。
 - `cargo clippy --workspace --all-targets -- -D warnings` 通过，当前 README 中列出的 workspace clippy gate 可作为真实本地质量门禁。
-- `npm test` 通过，覆盖 `@vesty/plugin-ui` bridge/protocol 测试以及 React/Svelte/Vue adapter export tests。
+- `npm test` 通过，覆盖 `vesty-plugin-ui` bridge/protocol 测试以及 React/Svelte/Vue adapter export tests。
 - `cargo check --workspace -j1` 通过，确认清理并重建 `target/debug` 后 workspace 仍可完整编译。
 - `vesty doctor --format json` 在当前 macOS 环境中报告 rustc/cargo/node/npm、VST3 binding baseline、macOS WebKit、codesign/notarytool 和 REAPER install detection 为 ok；Steinberg validator 未在当前 PATH/`VST3_VALIDATOR` 中发现，Cubase/Nuendo、Bitwig Studio、Ableton Live、Studio One 未安装。
 - `vesty release-check --format json --strict` 按预期失败，失败点是缺真实 DAW smoke evidence；REAPER 只检测到安装和 scan，仍缺 load/UI/UI->Host/meter stream/automation/buffer-sample-rate change/save-restore/offline render 当前 strict evidence，其它四个 DAW 全部 smoke evidence 缺失。该失败证明 release gate 没有把安装检测或模板当作发布通过证据。
@@ -4218,7 +4220,7 @@ rtk cargo test -p vesty-cli symlink -- --nocapture
 
 本次 2026-06-11 继续收紧 JSBridge Rust -> JS delivery 边界:
 
-- `@vesty/plugin-ui` 的 `__VESTY_INTERNAL__.deliver()` / `deliverBatch()` 现在会先做入站 packet/batch shape 校验: batch 必须是 array，packet 必须是 object、`v = 1`、合法 session/type、JavaScript safe-integer 范围内的非负 seq、已知 lane/kind；Rust -> JS packet 不能携带 `id`，response/error 必须有合法 `replyTo`，event/ack 不能混入 `replyTo` 或 `error`，malformed error payload 会被拒绝。
+- `vesty-plugin-ui` 的 `__VESTY_INTERNAL__.deliver()` / `deliverBatch()` 现在会先做入站 packet/batch shape 校验: batch 必须是 array，packet 必须是 object、`v = 1`、合法 session/type、JavaScript safe-integer 范围内的非负 seq、已知 lane/kind；Rust -> JS packet 不能携带 `id`，response/error 必须有合法 `replyTo`，event/ack 不能混入 `replyTo` 或 `error`，malformed error payload 会被拒绝。
 - wry bootstrap 内嵌 fallback bridge 使用同一 fail-closed 语义；畸形 packet 或非数组 batch 会被静默丢弃，不触发 subscription listener、不错误 resolve/reject pending request，也不从 dispatcher 抛异常。
 - 新增 JS SDK 测试覆盖 malformed inbound event batch、malformed response/error 不结算 pending request、后续合法 response 仍可完成；wry bootstrap string test 固定 `validInboundPacket()` / `validBridgeError()` / `deliverBatch` array guard。
 - 该改动不改变协议 wire format，也不替代 native `BridgeRuntime` 权威校验；它只是让 WebView 全局 dispatcher 面对旧脚本或畸形 evaluate_script 输入时更稳。
@@ -4228,7 +4230,7 @@ rtk cargo test -p vesty-cli symlink -- --nocapture
 - `vesty-ui-wry` 注入 bootstrap 的 `window.__VESTY_INTERNAL__.setSession(value)` 现在复用 session validator，拒绝 non-string、空字符串、超过 128 UTF-8 bytes 或包含控制字符的 session value。
 - `window.__VESTY_INTERNAL__.request(type, lane, payload)` 现在除了校验 request type，也会校验 lane 必须是已知 `BridgeLane`；非法 lane 不会创建 pending request、启动 timeout 或调用 `window.ipc.postMessage`。
 - wry bootstrap string test 固定 `BRIDGE_REQUEST_LANES`、`assertRequestLane(lane)`、`assertBridgeSessionValue(value, "session", validationError)` 和相关 validation error 文案存在；本地已通过 `rtk cargo fmt --all --check` 与 `rtk cargo test -p vesty-ui-wry bootstrap_script -- --nocapture`。
-- 该改动只保护 fallback/global internal JS 入口，不改变公开 `@vesty/plugin-ui` API，也不替代 native `BridgeRuntime` 对实际 IPC packet 的权威校验。
+- 该改动只保护 fallback/global internal JS 入口，不改变公开 `vesty-plugin-ui` API，也不替代 native `BridgeRuntime` 对实际 IPC packet 的权威校验。
 
 本次 2026-06-11 最终本地验证:
 
@@ -4774,14 +4776,14 @@ rtk cargo test -p vesty-cli symlink -- --nocapture
 
 本次 2026-06-12 收紧 Rust JSBridge session 权威校验:
 
-- `vesty-ipc` 新增 `MAX_BRIDGE_SESSION_BYTES = 128` 和 `validate_bridge_session()`，与 `@vesty/plugin-ui` / wry bootstrap 的 session guard 对齐: session 必须非空、最长 128 bytes、不能包含控制字符。
+- `vesty-ipc` 新增 `MAX_BRIDGE_SESSION_BYTES = 128` 和 `validate_bridge_session()`，与 `vesty-plugin-ui` / wry bootstrap 的 session guard 对齐: session 必须非空、最长 128 bytes、不能包含控制字符。
 - `vesty-bridge::BridgeRuntime::new()/try_new()` 现在会在建立 runtime 前校验初始 session 和 `BridgeReadyPayload.editor_session_id`，并以新的 `BridgeRuntimeCreateError` 区分参数 schema 错误和 session shape 错误。这样 native Rust bridge 入口不再只依赖 JS/wry 侧预校验，底层权威状态机也会拒绝畸形 session。
 - 新增 `bridge_runtime_try_new_rejects_invalid_sessions`，覆盖空 session、超长 session、控制字符 session 和畸形 editor session；既有 invalid param schema 测试已迁移到新的 create error。验证通过 `rtk cargo test -p vesty-ipc -- --nocapture`、两条 focused bridge tests、`rtk cargo test -p vesty-bridge -- --nocapture`、`rtk cargo clippy -p vesty-bridge --all-targets -- -D warnings`、`rtk cargo run -p vesty-cli -- export-types --out target/vesty-protocol --check`、`rtk cargo check -p vesty-vst3 --features "vst3-bindings wry-ui"`、`rtk cargo test --workspace -j1`、`rtk cargo clippy --workspace --all-targets -- -D warnings` 和 `rtk npm test`；workspace Rust tests 当前为 595 passed，Clippy 无 warning，JS workspace tests passed。
 - strict `release-check --require-release-artifacts` 仍按预期 failed；本地 ok 项仍为 host profiles、protocol snapshot、VST3 binding baseline、crate publish plan、crate package readiness、npm package pack report 和 dependency latest baseline，失败项仍是真实 DAW/CI/platform/validator/static/signing/notarization evidence 缺失。
 
 本次 2026-06-12 收紧 Rust JSBridge request id / replyTo 权威校验:
 
-- `vesty-ipc` 新增 `MAX_BRIDGE_PACKET_ID_BYTES = 128` 和 `validate_bridge_packet_id()`，与 `@vesty/plugin-ui` / wry bootstrap 的 `replyTo` guard 对齐: request id 必须非空、最长 128 bytes、不能包含控制字符。
+- `vesty-ipc` 新增 `MAX_BRIDGE_PACKET_ID_BYTES = 128` 和 `validate_bridge_packet_id()`，与 `vesty-plugin-ui` / wry bootstrap 的 `replyTo` guard 对齐: request id 必须非空、最长 128 bytes、不能包含控制字符。
 - `BridgePacket::response_to()` / `error_to()` 现在只会把通过校验的 request id 反射为 `replyTo`；空、超长或包含控制字符的 id 会被清洗为无 `replyTo`，避免错误回包把畸形 correlation id 带回 WebView。
 - `BridgeRuntime::handle_packet()` 在 request 分发前统一要求 `id` 存在且通过 `validate_bridge_packet_id()`；缺失、空、超长或包含控制字符的 request id 会返回 non-retryable `validation_error`，不会进入 hello/state/param/subscription handler。可恢复 parse error 路径也复用同一 validator，因此畸形 id 不会收到 parse-error response。
 - `BridgeRuntime::handle_packet()` 现在还会在 version/session mismatch 错误处理前校验 inbound session shape；空、超长或包含控制字符的 session 会 fail-closed 丢弃且不回包，避免把畸形 session 反射到 response envelope。合法但 stale 的 session 仍返回 `permission_denied`，保留 editor session 切换后的可诊断行为。
@@ -4795,45 +4797,45 @@ rtk cargo test -p vesty-cli symlink -- --nocapture
 
 本次 2026-06-12 收紧 JS SDK / wry bootstrap Rust -> JS inbound envelope 校验:
 
-- `@vesty/plugin-ui` 和 wry bootstrap 的 `validInboundPacket()` 现在拒绝 Rust -> JS packet 携带 `id`，并要求 event/ack 不能携带 `replyTo` 或 `error`。response/error 仍必须携带合法 `replyTo`，error 仍必须携带合法 error payload。
+- `vesty-plugin-ui` 和 wry bootstrap 的 `validInboundPacket()` 现在拒绝 Rust -> JS packet 携带 `id`，并要求 event/ack 不能携带 `replyTo` 或 `error`。response/error 仍必须携带合法 `replyTo`，error 仍必须携带合法 error payload。
 - `deliver()` 现在只把 `event` 派发给 subscription listener；`ack` 作为保留 kind 通过 shape/session 校验后静默忽略，不会被当作普通 event 触发 listener，也不会 settle pending request。
-- `packages/plugin-ui/tests/bridge.test.mjs` 增加 malformed inbound coverage，覆盖 event 携带 `id` / `replyTo` / `error`、ack 不派发、response 携带 server `id` 不结算 pending；`vesty-ui-wry` bootstrap script test 增加对应脚本断言。验证通过 `rtk npm --workspace @vesty/plugin-ui test`、`rtk npm test`、`rtk cargo test -p vesty-ui-wry --features wry-backend -- --nocapture` 和 `rtk cargo fmt --all --check`。
+- `packages/plugin-ui/tests/bridge.test.mjs` 增加 malformed inbound coverage，覆盖 event 携带 `id` / `replyTo` / `error`、ack 不派发、response 携带 server `id` 不结算 pending；`vesty-ui-wry` bootstrap script test 增加对应脚本断言。验证通过 `rtk npm --workspace vesty-plugin-ui test`、`rtk npm test`、`rtk cargo test -p vesty-ui-wry --features wry-backend -- --nocapture` 和 `rtk cargo fmt --all --check`。
 
 本次 2026-06-12 收紧 JSBridge packet flags 边界:
 
 - `vesty-ipc` 新增 `MAX_BRIDGE_PACKET_FLAGS = 16`、`MAX_BRIDGE_PACKET_FLAG_BYTES = 64` 和 `validate_bridge_packet_flags()`；flags 最多 16 个，每个 flag 必须非空、最长 64 bytes、不能包含控制字符。当前已知使用者是 meter event 的 `latest` flag，未知合法 flag 保留给未来扩展。
 - `vesty-bridge::BridgeRuntime` 在 request dispatch 前校验 inbound request flags；畸形 flags 返回 non-retryable `validation_error`，不会进入 hello/state/param/subscription handler。`vesty-ui-wry::ipc_handler_panic_response()` 也复用同一 flags validator，避免 panic fallback 反射畸形 flags。
-- `@vesty/plugin-ui` 和 wry bootstrap 的 `validInboundPacket()` 现在校验 Rust -> JS `flags` shape；合法 `["latest"]` event 仍可派发，畸形 flags 会 fail-closed 丢弃。
-- 新增 `validates_bridge_packet_flags`、`request_flags_are_validated_before_dispatch` 和 wry panic fallback flags case；JS bridge malformed inbound 测试覆盖 bad flags 和合法 `latest` flag。验证通过 `rtk cargo test -p vesty-ipc -- --nocapture`、`rtk cargo test -p vesty-bridge -- --nocapture`、`rtk cargo test -p vesty-ui-wry --features wry-backend -- --nocapture`、`rtk cargo clippy -p vesty-bridge --all-targets -- -D warnings` 和 `rtk npm --workspace @vesty/plugin-ui test`；`vesty-ipc` 为 7 passed，`vesty-bridge` 为 62 passed，`vesty-ui-wry` 为 17 passed。
+- `vesty-plugin-ui` 和 wry bootstrap 的 `validInboundPacket()` 现在校验 Rust -> JS `flags` shape；合法 `["latest"]` event 仍可派发，畸形 flags 会 fail-closed 丢弃。
+- 新增 `validates_bridge_packet_flags`、`request_flags_are_validated_before_dispatch` 和 wry panic fallback flags case；JS bridge malformed inbound 测试覆盖 bad flags 和合法 `latest` flag。验证通过 `rtk cargo test -p vesty-ipc -- --nocapture`、`rtk cargo test -p vesty-bridge -- --nocapture`、`rtk cargo test -p vesty-ui-wry --features wry-backend -- --nocapture`、`rtk cargo clippy -p vesty-bridge --all-targets -- -D warnings` 和 `rtk npm --workspace vesty-plugin-ui test`；`vesty-ipc` 为 7 passed，`vesty-bridge` 为 62 passed，`vesty-ui-wry` 为 17 passed。
 
 本次 2026-06-12 收紧 JSBridge packet seq 边界:
 
 - `vesty-ipc` 新增 `MAX_BRIDGE_PACKET_SEQ = 9_007_199_254_740_991`、`validate_bridge_packet_seq()` 和 `advance_bridge_packet_seq()`，把 Bridge envelope `seq` 明确限制在 JavaScript safe integer 范围内。这样 TS protocol 仍可用 `number`，但不会在 WebView 侧因为 JSON number 精度丢失而产生不可诊断的排序/关联问题。
 - `vesty-bridge::BridgeRuntime` 现在在 request dispatch 前校验 inbound request `seq`，recoverable parse-error fallback 也要求原始 packet `seq` 合法；outbound `next_seq()` 到达 safe-integer 上限后回绕到 `1`。新增 `request_seq_is_validated_before_dispatch`、`recoverable_parse_error_rejects_unsafe_seq` 和 `outbound_seq_wraps_before_js_safe_integer_overflow`。
-- `vesty-ui-wry::ipc_handler_panic_response()` 复用同一 seq validator，并用 `advance_bridge_packet_seq()` 生成 panic fallback response seq，避免 `saturating_add(1)` 推出 Web 端不可精确表示的值。wry bootstrap 和 `@vesty/plugin-ui` 都改用 `Number.isSafeInteger(packet.seq)` 入站校验，并在 JS request 发送端到达 `Number.MAX_SAFE_INTEGER` 后回绕到 `1`。
+- `vesty-ui-wry::ipc_handler_panic_response()` 复用同一 seq validator，并用 `advance_bridge_packet_seq()` 生成 panic fallback response seq，避免 `saturating_add(1)` 推出 Web 端不可精确表示的值。wry bootstrap 和 `vesty-plugin-ui` 都改用 `Number.isSafeInteger(packet.seq)` 入站校验，并在 JS request 发送端到达 `Number.MAX_SAFE_INTEGER` 后回绕到 `1`。
 - JS malformed inbound 测试覆盖超过 `Number.MAX_SAFE_INTEGER` 的 event 被丢弃；wry bootstrap script test 固定 `MAX_BRIDGE_PACKET_SEQ`、`Number.isSafeInteger(packet.seq)` 和 `nextSeq()` 语义存在。验证通过 `rtk cargo test -p vesty-ipc -- --nocapture`、`rtk cargo test -p vesty-bridge -- --nocapture`、`rtk cargo test -p vesty-ui-wry --features wry-backend -- --nocapture`、`rtk npm --workspace packages/plugin-ui test`、`rtk cargo fmt --all --check`、`rtk cargo run -p vesty-cli -- export-types --out target/vesty-protocol --check`、`rtk cargo test --workspace -j1`、`rtk cargo clippy --workspace --all-targets -- -D warnings`、`rtk npm test` 和 `rtk cargo check -p vesty-vst3 --features "vst3-bindings wry-ui"`；workspace Rust tests 当前为 609 passed，clippy 无 warning，JS workspace tests passed。strict `release-check --require-release-artifacts` 仍按预期 failed，失败项仍是真实 DAW/CI/platform/validator/static/signing/notarization evidence 缺失。
 
 本次 2026-06-12 收紧 Rust -> JS error code 边界:
 
-- `@vesty/plugin-ui` 和 wry bootstrap 的 `validBridgeError()` 现在要求 inbound error payload 的 `code` 必须属于 `BridgeErrorCode` 协议枚举: `parse_error`、`unsupported_version`、`unsupported_type`、`validation_error`、`permission_denied`、`timeout`、`backpressure`、`host_rejected`、`plugin_faulted`、`state_conflict` 或 `internal_error`。未知 error code 不再仅因“非空 string”通过入站校验。
+- `vesty-plugin-ui` 和 wry bootstrap 的 `validBridgeError()` 现在要求 inbound error payload 的 `code` 必须属于 `BridgeErrorCode` 协议枚举: `parse_error`、`unsupported_version`、`unsupported_type`、`validation_error`、`permission_denied`、`timeout`、`backpressure`、`host_rejected`、`plugin_faulted`、`state_conflict` 或 `internal_error`。未知 error code 不再仅因“非空 string”通过入站校验。
 - JS malformed inbound 测试新增 unknown error code case，证明畸形 error packet 不会 settle pending request，后续合法 response 仍能 resolve；wry bootstrap script test 固定 `BRIDGE_ERROR_CODES` 和 `BRIDGE_ERROR_CODES.has(value.code)` 存在。
 - Focused 验证通过 `rtk npm --workspace packages/plugin-ui test`、`rtk cargo test -p vesty-ui-wry --features wry-backend bootstrap_script_registers_host_subscriptions -- --nocapture` 和 `rtk cargo test -p vesty-ui-wry --features wry-backend ipc_handler_guard_drops_malformed_panic_response_envelopes -- --nocapture`。
 
 本次 2026-06-12 收紧 Rust -> JS response/error 字段互斥:
 
-- `@vesty/plugin-ui` 和 wry bootstrap 的 `validInboundPacket()` 现在要求 Rust -> JS `response` packet 不能携带 `error` 字段，`error` packet 不能携带 `payload` 字段。正常 response/error 仍按 `replyTo` 结算 pending request；字段污染的 response/error 会 fail-closed 丢弃。
+- `vesty-plugin-ui` 和 wry bootstrap 的 `validInboundPacket()` 现在要求 Rust -> JS `response` packet 不能携带 `error` 字段，`error` packet 不能携带 `payload` 字段。正常 response/error 仍按 `replyTo` 结算 pending request；字段污染的 response/error 会 fail-closed 丢弃。
 - JS malformed inbound 测试新增 response+error 和 error+payload case，证明畸形 packet 不会 settle pending request，后续合法 response 仍能 resolve；wry bootstrap script test 固定 `packet.kind === "response" && "error" in packet` 和 `packet.kind === "error" && "payload" in packet` guard。
 - Focused 验证通过 `rtk npm --workspace packages/plugin-ui test` 和 `rtk cargo test -p vesty-ui-wry --features wry-backend -- --nocapture`；`vesty-ui-wry` wry-backend tests 当前为 17 passed。
 
 本次 2026-06-12 收紧 Rust -> JS error message 边界:
 
 - `vesty-ipc` 新增 `MAX_BRIDGE_ERROR_MESSAGE_BYTES = 2048` 和 `validate_bridge_error_message()`，规定 Bridge error message 最长 2048 bytes 且不能包含控制字符。空 message 在协议层仍允许，便于极少数只依赖 code/details 的错误；常规 runtime 生成的 message 仍为可读字符串。
-- `@vesty/plugin-ui` 和 wry bootstrap 的 `validBridgeError()` 现在镜像同一 message 长度上限，超长 error message 会 fail-closed 丢弃，不会 settle pending request。
+- `vesty-plugin-ui` 和 wry bootstrap 的 `validBridgeError()` 现在镜像同一 message 长度上限，超长 error message 会 fail-closed 丢弃，不会 settle pending request。
 - JS malformed inbound 测试新增 2049-byte error message case；wry bootstrap script test 固定 `MAX_BRIDGE_ERROR_MESSAGE_BYTES` 和 `utf8ByteLength(value.message) <= MAX_BRIDGE_ERROR_MESSAGE_BYTES`。Focused 验证通过 `rtk cargo test -p vesty-ipc validates_bridge_error_message -- --nocapture`、`rtk npm --workspace packages/plugin-ui test` 和 `rtk cargo test -p vesty-ui-wry --features wry-backend -- --nocapture`。
 
 本次 2026-06-12 收紧 JSBridge JSON payload/details 边界:
 
-- `@vesty/plugin-ui` 和 wry bootstrap 新增 `validJsonValue()`、`validPlainDataRecord()`、`hasOwnDataProperty()` 和 `ownDataValue()`。Rust -> JS inbound `payload` 与 `error.details` 现在必须是 JSON-compatible value，并受 max depth 64、array items 65536、object keys 16384、nodes 262144、string bytes 262144 边界限制；`undefined`、function、symbol、`NaN`、`Infinity`、循环引用、非 plain object、symbol key、accessor/getter 属性和非 enumerable 属性都会 fail-closed 丢弃。
+- `vesty-plugin-ui` 和 wry bootstrap 新增 `validJsonValue()`、`validPlainDataRecord()`、`hasOwnDataProperty()` 和 `ownDataValue()`。Rust -> JS inbound `payload` 与 `error.details` 现在必须是 JSON-compatible value，并受 max depth 64、array items 65536、object keys 16384、nodes 262144、string bytes 262144 边界限制；`undefined`、function、symbol、`NaN`、`Infinity`、循环引用、非 plain object、symbol key、accessor/getter 属性和非 enumerable 属性都会 fail-closed 丢弃。
 - `validInboundPacket()` 和 `validBridgeError()` 现在通过 descriptor-safe 读取字段，不会触发 hostile object getter；`deliver()` / `packetMatchesSession()` 在通过 shape 校验后也复用 descriptor 读取 `kind`、`replyTo`、`error`、`payload`、`type` 和 `session`。畸形 direct `window.__VESTY_INTERNAL__.deliver()` 调用不会抛出、不会触发 listener，也不会错误 settle pending Promise。
 - JS -> Rust request payload 现在复用同一 JSON-compatible guard，避免 `JSON.stringify` 静默丢弃 `undefined` / function / symbol 或把 `NaN` / `Infinity` 改写成 `null`。无 payload 仍允许省略 payload 字段；param gesture helpers 现在只在确实提供 `gestureId` 时发送该字段，避免 `{ gestureId: undefined }`。
 - JS malformed inbound tests 新增 event payload 与 error.details 的 `undefined`、function、symbol、非有限 number、循环引用和 getter/accessor packet 覆盖；request payload tests 覆盖畸形 payload 被同步 `validation_error` 拒绝、不会发包也不会消耗 `seq`，后续合法 request 仍从 `js-1` 开始。wry bootstrap script test 固定 JSON guard、descriptor-safe helpers 和 outgoing payload guard。
@@ -5158,7 +5160,7 @@ rtk cargo test -p vesty-cli symlink -- --nocapture
 
 本次 2026-06-12 收紧 JSBridge `deliverBatch()` 入站批量上限:
 
-- `@vesty/plugin-ui` 和 `vesty-ui-wry` 注入 bootstrap 同步新增 `MAX_BRIDGE_BATCH_PACKETS = 4096`；`window.__VESTY_INTERNAL__.deliverBatch(packets)` 在处理前会要求 `packets` 是 array 且长度不超过该上限，超限 batch 整体忽略。
+- `vesty-plugin-ui` 和 `vesty-ui-wry` 注入 bootstrap 同步新增 `MAX_BRIDGE_BATCH_PACKETS = 4096`；`window.__VESTY_INTERNAL__.deliverBatch(packets)` 在处理前会要求 `packets` 是 array 且长度不超过该上限，超限 batch 整体忽略。
 - 这降低页面脚本或异常 host 回推把超大 packet array 丢进 UI thread 造成长时间同步遍历/handler 分发的风险，同时不影响正常 30/60 Hz meter/event flush batch。
 - JS SDK 测试新增超限 4097 packets 被忽略、4096 packets 仍可处理的行为覆盖；wry bootstrap 字符串测试新增常量和 guard 断言，保持 System WebView runtime 与 TS SDK 行为一致。
 - 已验证 `rtk npm test`、`rtk cargo test -p vesty-ui-wry -- --nocapture`、`rtk cargo test -p vesty-ui-wry --features wry-backend bootstrap_script_registers_host_subscriptions -- --nocapture`、`rtk cargo check -p vesty-ui-wry --features wry-backend` 和 `rtk cargo fmt --all --check`。本次是 JSBridge/UI-thread robustness hardening，不生成真实 DAW 或 platform smoke evidence。
@@ -5172,7 +5174,7 @@ rtk cargo test -p vesty-cli symlink -- --nocapture
 
 本次 2026-06-12 前置 WebView -> Rust IPC 消息大小检查:
 
-- `@vesty/plugin-ui` 和 `vesty-ui-wry` bootstrap fallback 现在在 `postMessage()` 前构造完整 bridge packet、预先 `JSON.stringify()`，并用 UTF-8 byte length 按 lane 检查 Rust 端同款上限: command/param/event/meter/log/lifecycle 为 64 KiB，state 为 256 KiB。
+- `vesty-plugin-ui` 和 `vesty-ui-wry` bootstrap fallback 现在在 `postMessage()` 前构造完整 bridge packet、预先 `JSON.stringify()`，并用 UTF-8 byte length 按 lane 检查 Rust 端同款上限: command/param/event/meter/log/lifecycle 为 64 KiB，state 为 256 KiB。
 - 超限请求会在 WebView 侧返回 retryable `backpressure`，不会调用 `window.ipc.postMessage()`，不会登记 pending request，也不会消耗 JS request `seq`；合法后续请求仍从同一个 `js-N` / `seq` 继续，降低 UI thread 和 native IPC 边界处理异常大 command payload 的成本。
 - JS 测试新增多字节 command payload 超限拒绝、后续合法请求仍为 `js-1`，并覆盖较大 state payload 可按 256 KiB state lane 上限发送；wry bootstrap 字符串测试固定 `MAX_COMMAND_MESSAGE_BYTES`、`MAX_STATE_MESSAGE_BYTES`、`maxMessageBytesForLane()` 和 `utf8ByteLength(message)` guard，并把 bootstrap 常量数值绑定到 `vesty-ipc` 的 Rust `MAX_COMMAND_MESSAGE_BYTES` / `MAX_STATE_MESSAGE_BYTES`，避免 Rust/JS lane size 上限漂移。
 - `.agents/12-jsbridge-design.md` 同步改为预序列化 `message`、按 lane byte 上限检查后 `postMessage(message)`，避免文档继续示例旧的直接 `JSON.stringify(packet)` 发送路径；seq 语义也写明只有通过本地 shape/size 校验、即将发送的 request 才消耗 `seq`。TS SDK 和 wry bootstrap 中旧的未用 `nextSeq()` helper 已删除。
@@ -5180,14 +5182,14 @@ rtk cargo test -p vesty-cli symlink -- --nocapture
 
 本次 2026-06-12 限制 async `event.flush` in-flight 积压:
 
-- `@vesty/plugin-ui` 和 `vesty-ui-wry` bootstrap 的 async event pump 现在每个 bridge instance 同时最多保留一个 in-flight `event.flush` request；若上一轮 flush 仍未 resolve/reject，下一次 16ms interval tick 会直接跳过，不再继续登记新的 pending request。
+- `vesty-plugin-ui` 和 `vesty-ui-wry` bootstrap 的 async event pump 现在每个 bridge instance 同时最多保留一个 in-flight `event.flush` request；若上一轮 flush 仍未 resolve/reject，下一次 16ms interval tick 会直接跳过，不再继续登记新的 pending request。
 - 正常 response、error、timeout 或 `postMessage` reject 后都会通过 `.finally()` 清掉 in-flight 标记；停止 event pump 不会清掉仍未 settle 的 in-flight 标记，避免退订后立刻重订阅绕过单 in-flight 保护。unload cleanup 会 reject pending request，然后由同一 `.finally()` 释放标记。这降低 host/UI 卡顿时 meter/param/fault/log 订阅导致 JS pending table 和 timer 堆积的风险。
 - JS 测试新增“多次 interval tick 在首个 `event.flush` 未返回前只发送一次，返回后下一 tick 才发送第二次”的覆盖，并覆盖退订停止 pump 后立刻重订阅时仍不会在第一个 flush settle 前发送第二个 flush；wry bootstrap 字符串测试固定 `eventFlushInFlight`、skip guard、finally reset，以及 stopEventPump 不直接清零 in-flight 标记。
 - 已验证 `rtk npm test`、`rtk cargo test -p vesty-ui-wry -- --nocapture`、`rtk cargo test -p vesty-ui-wry --features wry-backend bootstrap_script_registers_host_subscriptions -- --nocapture`、`rtk cargo check -p vesty-ui-wry --features wry-backend` 和 `rtk cargo fmt --all --check`。本次仍是本地 JSBridge/UI-thread robustness hardening，不生成真实 DAW、CI、validator、platform smoke、签名或 notarization evidence。
 
 本次 2026-06-12 补齐 async `event.flush` watchdog:
 
-- `@vesty/plugin-ui` 的普通 request timeout 仍遵守 `CreateBridgeOptions.timeoutMs`，但内部 async event pump 发送的 `event.flush` 现在总是使用固定 `EVENT_FLUSH_TIMEOUT_MS = 1000`。因此开发者把 `timeoutMs` 设为 `0` 时，普通 command/state/param request 可继续禁用 JS 侧 timeout，而 meter/param.changed/diagnostics/log 的 pump 不会因为某次 flush response 丢失而永久保持 `eventFlushInFlight = true`。
+- `vesty-plugin-ui` 的普通 request timeout 仍遵守 `CreateBridgeOptions.timeoutMs`，但内部 async event pump 发送的 `event.flush` 现在总是使用固定 `EVENT_FLUSH_TIMEOUT_MS = 1000`。因此开发者把 `timeoutMs` 设为 `0` 时，普通 command/state/param request 可继续禁用 JS 侧 timeout，而 meter/param.changed/diagnostics/log 的 pump 不会因为某次 flush response 丢失而永久保持 `eventFlushInFlight = true`。
 - `vesty-ui-wry` bootstrap fallback 也新增同名 `EVENT_FLUSH_TIMEOUT_MS`，并把内部 `request(type, lane, payload, options)` 扩展为可选 per-request timeout；非 finite timeout option 会回落到默认 `REQUEST_TIMEOUT_MS`，避免全局 internal 入口误把 `NaN` 当作禁用 timeout。
 - watchdog 超时会移除对应 pending request 并 reject 该 flush promise，由 `.finally()` 释放 in-flight 标记；迟到的旧 response 因 pending 已清理而被忽略，下一次 interval tick 可以发送新的 latest-wins flush。
 - JS 测试新增 fake timer 覆盖 `timeoutMs: 0` 下普通 request 不创建 timer、`event.flush` 创建 1000ms watchdog、watchdog 触发后下一 tick 恢复发送，以及迟到旧 response 不影响新 flush；既有 event pump 测试也补了显式 flush response，避免测试 suite 等待 watchdog timer。
@@ -5491,11 +5493,11 @@ rtk cargo test -p vesty-cli symlink -- --nocapture
 本次 2026-06-13 收紧 JSBridge 内建 request payload 与 wry runtime manifest:
 
 - `vesty-ipc::BridgePacket` 顶层仍保持 forward-compatible，不使用 `deny_unknown_fields`；新增测试明确允许未知顶层字段，避免后续协议扩展被当前 runtime 一刀切拒绝。`BridgeHelloPayload` 也保持公共握手扩展语义: Rust serde、JSON Schema 和 `vesty-bridge` runtime 都允许 hello payload 携带未来 JS capability 字段，只继续校验 supported protocol versions、JS package version 和 page URL 的已知字段。
-- `@vesty/plugin-ui` 的 ready payload 校验也明确保留公共协议扩展能力: ready response 顶层、capabilities、snapshot、param flags/kind 和 MIDI mapping 中的未知字段不会阻断握手，且成功后的 cached ready payload 会保留这些字段。新增 JS 回归测试覆盖扩展字段完成 `bridge.hello` -> `bridge.readyAck` 流程后可被 UI 读取，避免后续把公共 ready payload 误收紧成内部 manifest 语义。另一个 JS 回归测试覆盖 `bridge.hello.response.payload` accessor/getter 会在入站 packet guard 阶段 fail-closed 丢弃，不执行 getter、不发送 readyAck、不 settle ready promise，后续同一 pending request 收到合法 response 仍可恢复握手。Rust IPC 侧新增 `BridgeReadyPayload` 反序列化未知字段回归，并在 protocol export 测试中固定 ready payload schema 顶层不声明 `additionalProperties: false`。
-- `vesty-bridge` 对固定内建 request payload 增加 allowlist 校验: `bridge.readyAck`、`subscription.add/remove`、`state.setConfig`、`state.setUiState`、`param.begin/perform/end`、`param.format` 和 `param.parse` 出现拼写错误或额外字段时返回 non-retryable `validation_error`，不会污染 subscription table、pending gesture queue 或 state snapshot。`snapshot.get`、`diagnostics.get`、`meter.flush` 和 `event.flush` 也纳入固定 payload 规则，只接受无 payload、`null` payload 或空 object；`payload: null` 在当前公共 envelope 的 `Option<Value>` serde 形态下等价于省略 payload。`@vesty/plugin-ui` 和 wry bootstrap 的 query/flush helper 统一发送 `{}`；非空 object 或字符串、数组、布尔等非 object payload 会返回 validation error。该校验只作用于 Vesty 内建命令 payload，不改变 generic command payload 的 JSON 透传能力。
+- `vesty-plugin-ui` 的 ready payload 校验也明确保留公共协议扩展能力: ready response 顶层、capabilities、snapshot、param flags/kind 和 MIDI mapping 中的未知字段不会阻断握手，且成功后的 cached ready payload 会保留这些字段。新增 JS 回归测试覆盖扩展字段完成 `bridge.hello` -> `bridge.readyAck` 流程后可被 UI 读取，避免后续把公共 ready payload 误收紧成内部 manifest 语义。另一个 JS 回归测试覆盖 `bridge.hello.response.payload` accessor/getter 会在入站 packet guard 阶段 fail-closed 丢弃，不执行 getter、不发送 readyAck、不 settle ready promise，后续同一 pending request 收到合法 response 仍可恢复握手。Rust IPC 侧新增 `BridgeReadyPayload` 反序列化未知字段回归，并在 protocol export 测试中固定 ready payload schema 顶层不声明 `additionalProperties: false`。
+- `vesty-bridge` 对固定内建 request payload 增加 allowlist 校验: `bridge.readyAck`、`subscription.add/remove`、`state.setConfig`、`state.setUiState`、`param.begin/perform/end`、`param.format` 和 `param.parse` 出现拼写错误或额外字段时返回 non-retryable `validation_error`，不会污染 subscription table、pending gesture queue 或 state snapshot。`snapshot.get`、`diagnostics.get`、`meter.flush` 和 `event.flush` 也纳入固定 payload 规则，只接受无 payload、`null` payload 或空 object；`payload: null` 在当前公共 envelope 的 `Option<Value>` serde 形态下等价于省略 payload。`vesty-plugin-ui` 和 wry bootstrap 的 query/flush helper 统一发送 `{}`；非空 object 或字符串、数组、布尔等非 object payload 会返回 validation error。该校验只作用于 Vesty 内建命令 payload，不改变 generic command payload 的 JSON 透传能力。
 - `vesty-ui-wry` 的 release runtime asset manifest mirror 现在与 `vesty-build::AssetManifest` shape 对齐，读取 `version/root/entry/files` 并使用 `serde(deny_unknown_fields)`；manifest 版本必须为 1，root 不能为空且不能含控制字符，顶层或 nested asset file 的未知字段会在 WebView custom protocol attach 前以 invalid data 失败。
 - `vesty-build` static bundle validation 也开始校验 `assets.manifest.json` 的 version/root: `version` 必须为 1，`root` 必须非空且不能含控制字符。该字段仍作为 build-time provenance，不要求等于运行时 bundle 路径，因为 `.vst3` bundle 可以被移动。
-- 已验证 `rtk cargo fmt --all --check`、`rtk cargo test -p vesty-ipc -- --nocapture` 当前 14 passed、`rtk cargo test -p vesty-bridge -- --nocapture` 当前 73 passed、`rtk cargo test -p vesty-ui-wry --features wry-backend -- --nocapture` 当前 20 passed、`rtk cargo test -p vesty-build -- --nocapture` 当前 80 passed、`rtk cargo run -p vesty-cli -- export-types --out target/vesty-protocol --check`、`rtk npm test`、`rtk cargo test --workspace -j1` 当前 690 passed 和 `rtk cargo clippy --workspace --all-targets -- -D warnings`；本次补充 ready/hello payload 扩展字段、accessor/getter payload、Rust IPC/schema/runtime 回归和 fixed empty-payload query/flush guards 后再次通过 `rtk npm test`、`rtk cargo test -p vesty-ipc -- --nocapture` 当前 16 passed、`rtk cargo test -p vesty-bridge -- --nocapture` 当前 75 passed、`rtk cargo test -p vesty-ui-wry --features wry-backend bootstrap_script_registers_host_subscriptions -- --nocapture`、`rtk cargo run -p vesty-cli -- export-types --out target/vesty-protocol --check`、`rtk cargo fmt --all --check`、`rtk cargo test --workspace -j1` 当前 694 passed 和 `rtk cargo clippy --workspace --all-targets -- -D warnings`。后续又补充 `snapshot.get` / `diagnostics.get` SDK helper 显式 `{}` payload 断言，以及 query/flush 对字符串、数组、布尔等非 object payload 的 Rust 回归测试；已验证 `rtk cargo test -p vesty-bridge builtin_request_payloads -- --nocapture`、`rtk npm --workspace @vesty/plugin-ui test`、`rtk cargo run -p vesty-cli -- export-types --out target/vesty-protocol --check` 和 `rtk cargo fmt --all --check`。本次仍只是 local IPC/WebView/bundle metadata boundary hardening，不生成真实 DAW、CI、platform smoke、validator、签名或 notarization evidence。
+- 已验证 `rtk cargo fmt --all --check`、`rtk cargo test -p vesty-ipc -- --nocapture` 当前 14 passed、`rtk cargo test -p vesty-bridge -- --nocapture` 当前 73 passed、`rtk cargo test -p vesty-ui-wry --features wry-backend -- --nocapture` 当前 20 passed、`rtk cargo test -p vesty-build -- --nocapture` 当前 80 passed、`rtk cargo run -p vesty-cli -- export-types --out target/vesty-protocol --check`、`rtk npm test`、`rtk cargo test --workspace -j1` 当前 690 passed 和 `rtk cargo clippy --workspace --all-targets -- -D warnings`；本次补充 ready/hello payload 扩展字段、accessor/getter payload、Rust IPC/schema/runtime 回归和 fixed empty-payload query/flush guards 后再次通过 `rtk npm test`、`rtk cargo test -p vesty-ipc -- --nocapture` 当前 16 passed、`rtk cargo test -p vesty-bridge -- --nocapture` 当前 75 passed、`rtk cargo test -p vesty-ui-wry --features wry-backend bootstrap_script_registers_host_subscriptions -- --nocapture`、`rtk cargo run -p vesty-cli -- export-types --out target/vesty-protocol --check`、`rtk cargo fmt --all --check`、`rtk cargo test --workspace -j1` 当前 694 passed 和 `rtk cargo clippy --workspace --all-targets -- -D warnings`。后续又补充 `snapshot.get` / `diagnostics.get` SDK helper 显式 `{}` payload 断言，以及 query/flush 对字符串、数组、布尔等非 object payload 的 Rust 回归测试；已验证 `rtk cargo test -p vesty-bridge builtin_request_payloads -- --nocapture`、`rtk npm --workspace vesty-plugin-ui test`、`rtk cargo run -p vesty-cli -- export-types --out target/vesty-protocol --check` 和 `rtk cargo fmt --all --check`。本次仍只是 local IPC/WebView/bundle metadata boundary hardening，不生成真实 DAW、CI、platform smoke、validator、签名或 notarization evidence。
 
 本次 2026-06-13 收紧 param-manifest JSON report 未知字段拒绝:
 

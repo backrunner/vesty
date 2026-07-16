@@ -1,6 +1,6 @@
 # Web UI and JSBridge reference
 
-Read this reference for vanilla, React, Vue, Svelte, `@vesty/plugin-ui`, adapter, protocol, or WebView work.
+Read this reference for vanilla, React, Vue, Svelte, `vesty-plugin-ui`, adapter, protocol, or WebView work.
 
 ## Boundary
 
@@ -17,7 +17,7 @@ Vesty embeds the system WebView directly through `wry`; do not add Tauri. The We
 7. Unsubscribe and end active gestures when the component/editor is destroyed.
 
 ```ts
-import { createBridge } from '@vesty/plugin-ui';
+import { createBridge } from 'vesty-plugin-ui';
 
 const bridge = createBridge(window, 'pending');
 const ready = await bridge.ready();

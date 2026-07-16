@@ -7,7 +7,7 @@ Vesty is an alpha Rust-first framework for VST3 plugins with realtime-safe DSP a
 The current workspace combines:
 
 - Rust crates for plugin traits, DSP process contexts, typed parameters, realtime queues, VST3 integration, WebView UI runtime, packaging, validation, CLI workflows, and macros.
-- npm packages under `@vesty/*` for JSBridge integration and React/Vue/Svelte adapters.
+- The `vesty-plugin-ui` npm package for JSBridge integration and React/Vue/Svelte subpath adapters.
 - Example plugins under `examples/`.
 - Research, architecture, implementation status, and completion-audit notes under `.agents/`.
 

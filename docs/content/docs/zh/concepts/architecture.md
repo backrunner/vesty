@@ -15,7 +15,7 @@ DAW / VST3 宿主
         AudioKernel
              │ 固定容量遥测队列
              ▼
-      BridgeRuntime ─────── 系统 WebView ─────── @vesty/plugin-ui
+      BridgeRuntime ─────── 系统 WebView ─────── vesty-plugin-ui
 ```
 
 音频处理器和控制器是两个独立的 VST3 对象。Vesty 会明确划分两者的共享职责，而不是把状态隐藏在全局可变单例中。

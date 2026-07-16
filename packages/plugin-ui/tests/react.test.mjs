@@ -5,7 +5,7 @@ import {
   useVestyParamEdit,
   useVestySnapshot,
   useVestySnapshotStore
-} from "../dist/index.js";
+} from "../dist/react.js";
 
 assert.equal(typeof VestyBridgeProvider, "function");
 assert.equal(typeof useVestyBridge, "function");
@@ -13,4 +13,4 @@ assert.equal(typeof useVestyParamEdit, "function");
 assert.equal(typeof useVestySnapshot, "function");
 assert.equal(typeof useVestySnapshotStore, "function");
 
-console.log("@vesty/react exports ok");
+console.log("vesty-plugin-ui/react exports ok");

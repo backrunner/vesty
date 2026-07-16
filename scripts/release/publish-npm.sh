@@ -42,6 +42,3 @@ publish_package() {
 }
 
 publish_package packages/plugin-ui
-publish_package packages/react
-publish_package packages/vue
-publish_package packages/svelte

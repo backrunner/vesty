@@ -5,7 +5,7 @@ import {
   type SnapshotStoreOptions,
   type VestyBridge,
   type VestySnapshotStore
-} from "@vesty/plugin-ui";
+} from "./index.js";
 
 export interface VestySnapshotComposable<TSnapshot extends PluginSnapshot = PluginSnapshot> {
   snapshot: Readonly<ShallowRef<TSnapshot | undefined>>;

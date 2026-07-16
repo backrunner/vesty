@@ -6888,7 +6888,7 @@ const DEPENDENCY_BASELINE_MAX_CHECKS: usize = 256;
 const DEPENDENCY_BASELINE_HINT_MAX_BYTES: usize = 64 * 1024;
 const TYPESCRIPT_BASELINE_RANGE: &str = "^7.0.2";
 const TYPESCRIPT_BASELINE_LOCK_VERSION: &str = "7.0.2";
-const REQUIRED_JS_BASELINE_PACKAGES: &[&str] = &["plugin-ui", "react", "vue", "svelte"];
+const REQUIRED_JS_BASELINE_PACKAGES: &[&str] = &["plugin-ui"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct JsLatestBaselineDependency {
@@ -6901,28 +6901,28 @@ struct JsLatestBaselineDependency {
 
 const REQUIRED_JS_LATEST_BASELINE_DEPENDENCIES: &[JsLatestBaselineDependency] = &[
     JsLatestBaselineDependency {
-        workspace_package: "react",
+        workspace_package: "plugin-ui",
         dependency: "react",
         node_package_path: "node_modules/react",
         expected_range: "latest",
         expected_lock_version: "19.2.7",
     },
     JsLatestBaselineDependency {
-        workspace_package: "react",
+        workspace_package: "plugin-ui",
         dependency: "@types/react",
         node_package_path: "node_modules/@types/react",
         expected_range: "latest",
         expected_lock_version: "19.2.17",
     },
     JsLatestBaselineDependency {
-        workspace_package: "vue",
+        workspace_package: "plugin-ui",
         dependency: "vue",
         node_package_path: "node_modules/vue",
         expected_range: "latest",
         expected_lock_version: "3.5.39",
     },
     JsLatestBaselineDependency {
-        workspace_package: "svelte",
+        workspace_package: "plugin-ui",
         dependency: "svelte",
         node_package_path: "node_modules/svelte",
         expected_range: "latest",
@@ -7067,7 +7067,7 @@ fn dependency_baseline_report_with_optional_latest(
         let path = format!("packages/{package}/package.json");
         let package_json = read_json_file(&workspace.join(&path))?;
         checks.push(dependency_baseline_check(
-            &format!("npm package `@vesty/{package}` TypeScript devDependency"),
+            "npm package `vesty-plugin-ui` TypeScript devDependency",
             "npm",
             &path,
             TYPESCRIPT_BASELINE_RANGE,
@@ -7090,7 +7090,7 @@ fn dependency_baseline_report_with_optional_latest(
     ));
     for package in REQUIRED_JS_BASELINE_PACKAGES {
         checks.push(dependency_baseline_check(
-            &format!("npm lockfile `@vesty/{package}` TypeScript devDependency"),
+            "npm lockfile `vesty-plugin-ui` TypeScript devDependency",
             "npm-lock",
             lock_path,
             TYPESCRIPT_BASELINE_RANGE,
@@ -7108,8 +7108,8 @@ fn dependency_baseline_report_with_optional_latest(
         let package_json = read_json_file(&workspace.join(&package_json_path))?;
         checks.push(dependency_baseline_check(
             &format!(
-                "npm package `@vesty/{}` {} devDependency range",
-                dependency.workspace_package, dependency.dependency
+                "npm package `vesty-plugin-ui` {} devDependency range",
+                dependency.dependency
             ),
             "npm",
             &package_json_path,
@@ -7216,28 +7216,24 @@ fn expected_dependency_baseline_check_keys(include_latest: bool) -> BTreeSet<Str
         "vst3-sdk",
         "upstream `vst3` crate binding baseline",
     ));
-    for package in REQUIRED_JS_BASELINE_PACKAGES {
-        expected.insert(dependency_baseline_check_key(
-            "npm",
-            &format!("npm package `@vesty/{package}` TypeScript devDependency"),
-        ));
-    }
+    expected.insert(dependency_baseline_check_key(
+        "npm",
+        "npm package `vesty-plugin-ui` TypeScript devDependency",
+    ));
     expected.insert(dependency_baseline_check_key(
         "npm-lock",
         "npm lockfile `typescript` installed version",
     ));
-    for package in REQUIRED_JS_BASELINE_PACKAGES {
-        expected.insert(dependency_baseline_check_key(
-            "npm-lock",
-            &format!("npm lockfile `@vesty/{package}` TypeScript devDependency"),
-        ));
-    }
+    expected.insert(dependency_baseline_check_key(
+        "npm-lock",
+        "npm lockfile `vesty-plugin-ui` TypeScript devDependency",
+    ));
     for dependency in REQUIRED_JS_LATEST_BASELINE_DEPENDENCIES {
         expected.insert(dependency_baseline_check_key(
             "npm",
             &format!(
-                "npm package `@vesty/{}` {} devDependency range",
-                dependency.workspace_package, dependency.dependency
+                "npm package `vesty-plugin-ui` {} devDependency range",
+                dependency.dependency
             ),
         ));
         expected.insert(dependency_baseline_check_key(
@@ -9585,7 +9581,7 @@ fn release_evidence_readme() -> String {
         "- `platform-smoke/`: place platform smoke JSON reports from macOS, Windows x64 and Linux X11 real host/platform runs. `--require-release-artifacts` requires all three platforms and checks system WebView, VST3 validator, VST3 example scan, WebView attach/resize, manifest asset protocol, JSBridge roundtrip and nonzero meter stream evidence. Linux Wayland remains experimental and does not satisfy the Linux X11 gate.",
         "- `publish-plan/publish-plan.json`: place the downloaded `vesty-publish-plan` artifact from CI, or generate it with `vesty publish-plan --out publish-plan/publish-plan.json`. The report must preserve dependency-safe crate order.",
         "- `crate-package/crate-package.json`: crate package readiness report from CI, or generate it with `vesty crate-package --out crate-package/crate-package.json`. It is required by `release-check --require-release-artifacts` and must show zero-internal-dependency crates as `packaged` and internal-dependent crates as `deferred` until their workspace dependencies are published.",
-        "- `npm-pack/npm-pack.json`: place the downloaded npm pack dry-run artifact from CI, or generate it with `vesty npm-pack --out npm-pack/npm-pack.json`. The report must include `@vesty/plugin-ui`, `@vesty/react`, `@vesty/vue` and `@vesty/svelte`, and each packed file must stay inside `dist/**` or `package.json`.",
+        "- `npm-pack/npm-pack.json`: place the downloaded npm pack dry-run artifact from CI, or generate it with `vesty npm-pack --out npm-pack/npm-pack.json`. The report must include `vesty-plugin-ui`, and each packed file must stay inside `dist/**` or `package.json`.",
         "- `dependency-baseline/dependency-baseline-latest.json`: place the downloaded latest dependency review artifact from CI, or generate it with `vesty dependency-baseline --latest --out dependency-baseline/dependency-baseline-latest.json`. The report must include the `cargo workspace external dependency baseline coverage` check plus crates.io/npm registry latest checks. `dependency-baseline.json` without registry latest checks is useful drift evidence, but it does not satisfy the final `--require-release-artifacts` gate.",
         "- `vst3-sdk/vst3-sdk-headers.json`: optional official Steinberg VST3 SDK header input manifest generated by `vesty vst3-sdk manifest`. When present, `release-check` verifies manifest version, generator, SDK/crate baselines, required header set, `missing_headers`, SHA-256 shape and completeness. This is audit evidence for the reserved generated-headers backend; absence stays `skipped` while the upstream `vst3` crate backend is active.",
         "- `vst3-sdk/generated-bindings-plan.json`: optional generated-bindings readiness plan generated by `vesty vst3-sdk binding-plan`. When present, `release-check` verifies the locked SDK header manifest, `.rs` output module path, active backend baseline and reserved binding emitter check. This does not claim full SDK 3.8 bindings are generated; `bindingsGenerated` must remain false until the emitter exists.",
@@ -9757,7 +9753,7 @@ fn npm_pack_evidence_readme() -> String {
         "vesty npm-pack --out npm-pack/npm-pack.json",
         "```",
         "",
-        "`vesty npm-pack` runs `npm pack --workspaces --dry-run --json` and then applies the same validation used by `release-check`: the report must include `@vesty/plugin-ui`, `@vesty/react`, `@vesty/vue` and `@vesty/svelte`, with packed files limited to `dist/**` and `package.json`.",
+        "`vesty npm-pack` runs `npm pack --workspaces --dry-run --json` and then applies the same validation used by `release-check`: the report must include `vesty-plugin-ui`, with packed files limited to `dist/**` and `package.json`.",
         "",
         "This README is only a placeholder. It does not count as npm pack evidence.",
         "",
@@ -11880,12 +11876,7 @@ fn crate_package_release_check(
     }
 }
 
-const REQUIRED_NPM_PACKAGES: [&str; 4] = [
-    "@vesty/plugin-ui",
-    "@vesty/react",
-    "@vesty/svelte",
-    "@vesty/vue",
-];
+const REQUIRED_NPM_PACKAGES: [&str; 1] = ["vesty-plugin-ui"];
 const NPM_PACK_MAX_PACKAGES: usize = 16;
 const NPM_PACK_MAX_FILES_PER_PACKAGE: usize = 512;
 const NPM_PACK_MAX_TOTAL_FILES: usize = 2048;
@@ -20142,7 +20133,7 @@ fn create_project(
         .map(|path| {
             Utf8PathBuf::from_path_buf(path.canonicalize()?).map_err(
                 |_| -> Box<dyn std::error::Error> {
-                    "@vesty/plugin-ui path is not valid utf-8".into()
+                    "vesty-plugin-ui path is not valid utf-8".into()
                 },
             )
         })
@@ -20248,7 +20239,7 @@ const PROJECT_TEMPLATES: &[ProjectTemplate] = &[
         title: "React Web UI Parameter Demo",
         kind: "effect",
         ui: "react",
-        description: "Audio effect plus React/Vite Web UI wired to @vesty/plugin-ui parameter gestures.",
+        description: "Audio effect plus React/Vite Web UI wired to vesty-plugin-ui parameter gestures.",
     },
     ProjectTemplate {
         id: "vanilla-ui-param-demo",
@@ -20264,7 +20255,7 @@ const PROJECT_TEMPLATES: &[ProjectTemplate] = &[
         title: "Vue Web UI Parameter Demo",
         kind: "effect",
         ui: "vue",
-        description: "Audio effect plus Vue/Vite UI using the @vesty/vue adapter.",
+        description: "Audio effect plus Vue/Vite UI using the vesty-plugin-ui Vue adapter.",
     },
     ProjectTemplate {
         id: "svelte-ui-param-demo",
@@ -20272,7 +20263,7 @@ const PROJECT_TEMPLATES: &[ProjectTemplate] = &[
         title: "Svelte Web UI Parameter Demo",
         kind: "effect",
         ui: "svelte",
-        description: "Audio effect plus Svelte/Vite UI using the @vesty/svelte adapter.",
+        description: "Audio effect plus Svelte/Vite UI using the vesty-plugin-ui Svelte adapter.",
     },
     ProjectTemplate {
         id: "midi-synth",
@@ -20543,41 +20534,14 @@ impl UiTemplate {
 #[derive(Clone, Debug, Default)]
 struct UiPackagePaths {
     plugin_ui: Option<Utf8PathBuf>,
-    react: Option<Utf8PathBuf>,
-    vue: Option<Utf8PathBuf>,
-    svelte: Option<Utf8PathBuf>,
 }
 
 impl UiPackagePaths {
     fn from_plugin_ui_path(plugin_ui_path: Option<&Utf8Path>) -> Self {
         Self {
             plugin_ui: plugin_ui_path.map(Utf8Path::to_path_buf),
-            react: sibling_ui_package_path(plugin_ui_path, "react"),
-            vue: sibling_ui_package_path(plugin_ui_path, "vue"),
-            svelte: sibling_ui_package_path(plugin_ui_path, "svelte"),
         }
     }
-
-    fn adapter_path(&self, template: UiTemplate) -> Option<&Utf8Path> {
-        match template {
-            UiTemplate::React => self.react.as_deref(),
-            UiTemplate::Vue => self.vue.as_deref(),
-            UiTemplate::Svelte => self.svelte.as_deref(),
-            UiTemplate::None | UiTemplate::Vanilla => None,
-        }
-    }
-}
-
-fn sibling_ui_package_path(
-    plugin_ui_path: Option<&Utf8Path>,
-    sibling: &str,
-) -> Option<Utf8PathBuf> {
-    let candidate = plugin_ui_path?.parent()?.join(sibling);
-    if !candidate.is_dir() {
-        return None;
-    }
-    let path = candidate.canonicalize().ok()?;
-    Utf8PathBuf::from_path_buf(path).ok()
 }
 
 fn parse_ui_template(ui: &str) -> Result<UiTemplate, Box<dyn std::error::Error>> {
@@ -21015,10 +20979,6 @@ fn ui_package_json(template: UiTemplate, package_paths: &UiPackagePaths) -> Stri
         .as_deref()
         .map(|path| format!("file:{}", path.as_str()))
         .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
-    let adapter_dependency = package_paths
-        .adapter_path(template)
-        .map(|path| format!("file:{}", path.as_str()))
-        .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
     let typecheck_script = match template {
         UiTemplate::Vue => "vue-tsc --noEmit",
         UiTemplate::Svelte => "svelte-check --tsconfig ./tsconfig.json",
@@ -21031,24 +20991,18 @@ fn ui_package_json(template: UiTemplate, package_paths: &UiPackagePaths) -> Stri
     };
     let framework_dependencies = match template {
         UiTemplate::None | UiTemplate::Vanilla => String::new(),
-        UiTemplate::React => format!(
+        UiTemplate::React => String::from(
             r#",
-    "@vesty/react": {},
     "react": "latest",
     "react-dom": "latest""#,
-            json_string_literal(&adapter_dependency)
         ),
-        UiTemplate::Vue => format!(
+        UiTemplate::Vue => String::from(
             r#",
-    "@vesty/vue": {},
     "vue": "latest""#,
-            json_string_literal(&adapter_dependency)
         ),
-        UiTemplate::Svelte => format!(
+        UiTemplate::Svelte => String::from(
             r#",
-    "@vesty/svelte": {},
     "svelte": "latest""#,
-            json_string_literal(&adapter_dependency)
         ),
     };
     let framework_dev_dependencies = match template {
@@ -21081,7 +21035,7 @@ fn ui_package_json(template: UiTemplate, package_paths: &UiPackagePaths) -> Stri
     "typecheck": "__TYPECHECK_SCRIPT__"
   },
   "dependencies": {
-    "@vesty/plugin-ui": __PLUGIN_UI_DEPENDENCY____FRAMEWORK_DEPENDENCIES__
+    "vesty-plugin-ui": __PLUGIN_UI_DEPENDENCY____FRAMEWORK_DEPENDENCIES__
   },
   "devDependencies": {
     "typescript": "__TYPESCRIPT_DEPENDENCY__",
@@ -21200,7 +21154,7 @@ fn ui_index_html(name: &str, template: UiTemplate, param: UiParamTemplate) -> St
 }
 
 fn ui_index_ts(param: UiParamTemplate) -> String {
-    r##"import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from "@vesty/plugin-ui";
+    r##"import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from "vesty-plugin-ui";
 
 const bridge = createBridge();
 const control = document.querySelector<HTMLInputElement>("#__PARAM_ID__");
@@ -21281,8 +21235,8 @@ createRoot(document.getElementById("root")!).render(<App />);
 
 fn ui_react_app_tsx(param: UiParamTemplate) -> String {
     r#"import { useEffect, useMemo, useRef, useState } from "react";
-import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from "@vesty/plugin-ui";
-import { VestyBridgeProvider, useVestyBridge, useVestyParamEdit } from "@vesty/react";
+import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from "vesty-plugin-ui";
+import { VestyBridgeProvider, useVestyBridge, useVestyParamEdit } from "vesty-plugin-ui/react";
 
 const PARAM_ID = "__PARAM_ID__";
 const PARAM_DEFAULT = __PARAM_DEFAULT__;
@@ -21399,8 +21353,8 @@ createApp(App).mount("#app");
 fn ui_vue_app(param: UiParamTemplate) -> String {
     r#"<script setup lang="ts">
 import { onMounted, onScopeDispose, ref } from "vue";
-import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from "@vesty/plugin-ui";
-import { useVestyParamEdit } from "@vesty/vue";
+import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from "vesty-plugin-ui";
+import { useVestyParamEdit } from "vesty-plugin-ui/vue";
 
 const bridge = createBridge();
 const PARAM_ID = "__PARAM_ID__";
@@ -21499,8 +21453,8 @@ mount(App, {
 fn ui_svelte_app(param: UiParamTemplate) -> String {
     r#"<script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from "@vesty/plugin-ui";
-  import { vestyParamEdit } from "@vesty/svelte";
+  import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from "vesty-plugin-ui";
+  import { vestyParamEdit } from "vesty-plugin-ui/svelte";
 
   const bridge = createBridge();
   const PARAM_ID = "__PARAM_ID__";
@@ -24592,7 +24546,7 @@ Result: 47 tests passed, 0 tests failed
             if actual != expected {
                 assert_eq!(
                     actual, expected,
-                    "@vesty/plugin-ui protocol source drifted: {relative}"
+                    "vesty-plugin-ui protocol source drifted: {relative}"
                 );
             }
         }
@@ -24608,7 +24562,7 @@ Result: 47 tests passed, 0 tests failed
             .collect::<Vec<_>>();
         assert!(
             extra.is_empty(),
-            "@vesty/plugin-ui has stale generated protocol sources: {extra:?}"
+            "vesty-plugin-ui has stale generated protocol sources: {extra:?}"
         );
     }
 
@@ -24718,7 +24672,7 @@ Result: 47 tests passed, 0 tests failed
             );
         }
 
-        for package in ["plugin-ui", "react", "svelte", "vue"] {
+        for package in ["plugin-ui"] {
             let package_json =
                 fs::read_to_string(root.join("packages").join(package).join("package.json"))
                     .unwrap();
@@ -26623,8 +26577,8 @@ Result: 47 tests passed, 0 tests failed
 
         let check = npm_pack_release_check(Some(&valid), true);
         assert_eq!(check.status, "ok");
-        assert!(check.value.contains("4 package"));
-        assert!(check.value.contains("@vesty/plugin-ui"));
+        assert!(check.value.contains("1 package"));
+        assert!(check.value.contains("vesty-plugin-ui"));
 
         let missing = npm_pack_release_check(None, false);
         assert_eq!(missing.status, "skipped");
@@ -26648,7 +26602,7 @@ Result: 47 tests passed, 0 tests failed
     fn npm_pack_report_rejects_unknown_json_fields() {
         let unknown_entry = r#"[
           {
-            "name": "@vesty/plugin-ui",
+            "name": "vesty-plugin-ui",
             "version": "0.1.0",
             "filename": "vesty-plugin-ui-0.1.0.tgz",
             "files": [{ "path": "package.json" }, { "path": "dist/index.js" }],
@@ -26660,7 +26614,7 @@ Result: 47 tests passed, 0 tests failed
 
         let unknown_file = r#"[
           {
-            "name": "@vesty/plugin-ui",
+            "name": "vesty-plugin-ui",
             "version": "0.1.0",
             "filename": "vesty-plugin-ui-0.1.0.tgz",
             "files": [{ "path": "package.json", "mode": 420 }]
@@ -26674,8 +26628,8 @@ Result: 47 tests passed, 0 tests failed
     fn npm_pack_command_output_normalizes_external_metadata() {
         let command_output = r#"[
           {
-            "id": "@vesty/plugin-ui@0.1.0",
-            "name": "@vesty/plugin-ui",
+            "id": "vesty-plugin-ui@0.1.0",
+            "name": "vesty-plugin-ui",
             "version": "0.1.0",
             "size": 1024,
             "unpackedSize": 4096,
@@ -26693,12 +26647,12 @@ Result: 47 tests passed, 0 tests failed
 
         let entries = parse_npm_pack_command_output(command_output).unwrap();
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].name, "@vesty/plugin-ui");
+        assert_eq!(entries[0].name, "vesty-plugin-ui");
         assert_eq!(entries[0].files.len(), 2);
         assert_eq!(entries[0].files[1].path, "dist/index.js");
 
         let normalized = serde_json::to_value(entries).unwrap();
-        assert_eq!(normalized[0]["name"], "@vesty/plugin-ui");
+        assert_eq!(normalized[0]["name"], "vesty-plugin-ui");
         assert_eq!(normalized[0]["files"][0]["path"], "package.json");
         assert!(normalized[0].get("id").is_none());
         assert!(normalized[0]["files"][0].get("mode").is_none());
@@ -26794,7 +26748,7 @@ Result: 47 tests passed, 0 tests failed
         control_npm_filename[0].filename = "vesty-plugin-ui\n0.1.0.tgz".to_string();
         let error = validate_npm_pack_entries(&control_npm_filename).unwrap_err();
         assert!(error.to_string().contains(
-            "npm package `@vesty/plugin-ui` filename must not contain control characters"
+            "npm package `vesty-plugin-ui` filename must not contain control characters"
         ));
 
         let mut duplicate_npm_file = test_npm_pack_report();
@@ -28975,7 +28929,7 @@ license: MIT
         assert!(report.checks.iter().any(|check| {
             check.name == "npm package pack report"
                 && check.status == "ok"
-                && check.value.contains("@vesty/plugin-ui")
+                && check.value.contains("vesty-plugin-ui")
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "dependency latest baseline"
@@ -31627,34 +31581,23 @@ license: MIT
     }
 
     fn test_npm_pack_report() -> Vec<NpmPackEntry> {
-        [
-            (
-                "@vesty/plugin-ui",
-                "vesty-plugin-ui-0.1.0.tgz",
-                vec![
-                    "dist/index.d.ts",
-                    "dist/index.js",
-                    "dist/protocol/index.d.ts",
-                    "dist/protocol/index.js",
-                    "package.json",
-                ],
-            ),
-            (
-                "@vesty/react",
-                "vesty-react-0.1.0.tgz",
-                vec!["dist/index.d.ts", "dist/index.js", "package.json"],
-            ),
-            (
-                "@vesty/svelte",
-                "vesty-svelte-0.1.0.tgz",
-                vec!["dist/index.d.ts", "dist/index.js", "package.json"],
-            ),
-            (
-                "@vesty/vue",
-                "vesty-vue-0.1.0.tgz",
-                vec!["dist/index.d.ts", "dist/index.js", "package.json"],
-            ),
-        ]
+        [(
+            "vesty-plugin-ui",
+            "vesty-plugin-ui-0.1.0.tgz",
+            vec![
+                "dist/index.d.ts",
+                "dist/index.js",
+                "dist/protocol/index.d.ts",
+                "dist/protocol/index.js",
+                "dist/react.d.ts",
+                "dist/react.js",
+                "dist/svelte.d.ts",
+                "dist/svelte.js",
+                "dist/vue.d.ts",
+                "dist/vue.js",
+                "package.json",
+            ],
+        )]
         .into_iter()
         .map(|(name, filename, files)| NpmPackEntry {
             name: name.to_string(),
@@ -32639,7 +32582,7 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
         assert!(readme.contains("ci-release-checks/"));
         assert!(readme.contains("release-action-plan-<OS>.json"));
         assert!(readme.contains("release-check pass evidence"));
-        assert!(readme.contains("@vesty/plugin-ui"));
+        assert!(readme.contains("vesty-plugin-ui"));
         assert!(readme.contains("Steinberg validator-passed reports for `VestyGain.vst3`"));
         assert!(readme.contains("`linux-x64`, `macos` and `windows-x64`"));
         assert!(readme.contains("full 3x3 validator matrix"));
@@ -37669,13 +37612,12 @@ bridge timeout
     fn ui_package_template_can_use_local_plugin_ui_path() {
         let package_paths = UiPackagePaths {
             plugin_ui: Some(Utf8PathBuf::from("/tmp/vesty plugin-ui")),
-            ..UiPackagePaths::default()
         };
         let package_json = ui_package_json(UiTemplate::Vanilla, &package_paths);
         let value = serde_json::from_str::<serde_json::Value>(&package_json).unwrap();
         assert_eq!(value["private"], true);
         assert_eq!(
-            value["dependencies"]["@vesty/plugin-ui"],
+            value["dependencies"]["vesty-plugin-ui"],
             "file:/tmp/vesty plugin-ui"
         );
 
@@ -37683,61 +37625,8 @@ bridge timeout
         let value = serde_json::from_str::<serde_json::Value>(&published).unwrap();
         assert_eq!(value["private"], true);
         assert_eq!(
-            value["dependencies"]["@vesty/plugin-ui"],
+            value["dependencies"]["vesty-plugin-ui"],
             env!("CARGO_PKG_VERSION")
-        );
-    }
-
-    #[test]
-    fn ui_package_template_infers_local_framework_adapter_paths() {
-        let temp = tempfile::tempdir().unwrap();
-        let packages = Utf8PathBuf::from_path_buf(temp.path().join("packages")).unwrap();
-        let plugin_ui = packages.join("plugin-ui");
-        fs::create_dir_all(&plugin_ui).unwrap();
-        fs::create_dir_all(packages.join("react")).unwrap();
-        fs::create_dir_all(packages.join("vue")).unwrap();
-        fs::create_dir_all(packages.join("svelte")).unwrap();
-
-        let package_paths = UiPackagePaths::from_plugin_ui_path(Some(&plugin_ui));
-
-        let react = serde_json::from_str::<serde_json::Value>(&ui_package_json(
-            UiTemplate::React,
-            &package_paths,
-        ))
-        .unwrap();
-        assert_eq!(
-            react["dependencies"]["@vesty/plugin-ui"],
-            format!("file:{plugin_ui}")
-        );
-        assert_eq!(
-            react["dependencies"]["@vesty/react"],
-            format!(
-                "file:{}",
-                packages.join("react").canonicalize_utf8().unwrap()
-            )
-        );
-
-        let vue = serde_json::from_str::<serde_json::Value>(&ui_package_json(
-            UiTemplate::Vue,
-            &package_paths,
-        ))
-        .unwrap();
-        assert_eq!(
-            vue["dependencies"]["@vesty/vue"],
-            format!("file:{}", packages.join("vue").canonicalize_utf8().unwrap())
-        );
-
-        let svelte = serde_json::from_str::<serde_json::Value>(&ui_package_json(
-            UiTemplate::Svelte,
-            &package_paths,
-        ))
-        .unwrap();
-        assert_eq!(
-            svelte["dependencies"]["@vesty/svelte"],
-            format!(
-                "file:{}",
-                packages.join("svelte").canonicalize_utf8().unwrap()
-            )
         );
     }
 
@@ -37772,7 +37661,7 @@ bridge timeout
         .unwrap();
         let vanilla = fs::read_to_string(root.join("ui/src/index.ts")).unwrap();
         assert!(vanilla.contains(
-            "import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from \"@vesty/plugin-ui\""
+            "import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from \"vesty-plugin-ui\""
         ));
         assert!(vanilla.contains("const ready = await bridge.ready()"));
         assert!(vanilla.contains("ready.snapshot"));
@@ -37803,7 +37692,7 @@ bridge timeout
                 UiTemplate::React => {
                     let app = fs::read_to_string(root.join("ui/src/App.tsx")).unwrap();
                     assert_eq!(
-                        package["dependencies"]["@vesty/react"],
+                        package["dependencies"]["vesty-plugin-ui"],
                         env!("CARGO_PKG_VERSION")
                     );
                     assert!(package_json.contains("\"react\""));
@@ -37813,7 +37702,7 @@ bridge timeout
                     assert_eq!(package["devDependencies"]["@types/react-dom"], "latest");
                     assert!(index_html.contains("/src/main.tsx"));
                     assert!(vite_config.contains("react()"));
-                    assert!(app.contains("@vesty/react"));
+                    assert!(app.contains("vesty-plugin-ui/react"));
                     assert!(app.contains("useVestyParamEdit"));
                     assert_ready_param_binding(&app);
                     assert!(app.contains("setPointerCapture"));
@@ -37825,7 +37714,7 @@ bridge timeout
                 UiTemplate::Vue => {
                     let app = fs::read_to_string(root.join("ui/src/App.vue")).unwrap();
                     assert_eq!(
-                        package["dependencies"]["@vesty/vue"],
+                        package["dependencies"]["vesty-plugin-ui"],
                         env!("CARGO_PKG_VERSION")
                     );
                     assert!(package_json.contains("\"vue\""));
@@ -37835,7 +37724,7 @@ bridge timeout
                     assert_eq!(package["devDependencies"]["typescript"], "6.0.3");
                     assert!(index_html.contains("/src/main.ts"));
                     assert!(vite_config.contains("vue()"));
-                    assert!(app.contains("@vesty/vue"));
+                    assert!(app.contains("vesty-plugin-ui/vue"));
                     assert!(app.contains("useVestyParamEdit"));
                     assert_ready_param_binding(&app);
                     assert!(app.contains("setPointerCapture"));
@@ -37847,7 +37736,7 @@ bridge timeout
                 UiTemplate::Svelte => {
                     let app = fs::read_to_string(root.join("ui/src/App.svelte")).unwrap();
                     assert_eq!(
-                        package["dependencies"]["@vesty/svelte"],
+                        package["dependencies"]["vesty-plugin-ui"],
                         env!("CARGO_PKG_VERSION")
                     );
                     assert!(package_json.contains("\"svelte\""));
@@ -37860,7 +37749,7 @@ bridge timeout
                     assert_eq!(package["devDependencies"]["typescript"], "6.0.3");
                     assert!(index_html.contains("/src/main.ts"));
                     assert!(vite_config.contains("svelte()"));
-                    assert!(app.contains("@vesty/svelte"));
+                    assert!(app.contains("vesty-plugin-ui/svelte"));
                     assert!(app.contains("vestyParamEdit"));
                     assert_ready_param_binding(&app);
                     assert!(app.contains("setPointerCapture"));

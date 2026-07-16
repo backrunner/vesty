@@ -125,7 +125,7 @@
 - program list metadata + opt-in `apply_program()` + controller-side program data MVP 已本地实现；program-change 参数 metadata 已映射到 VST3 `kIsProgramChange`，并已支持 controller/control-thread `setParamNormalized()` / edit relay 选择可见 program；`examples/midi-synth` 已作为 concrete program/preset workflow 示例，覆盖 host-visible program 参数、program list metadata、program attributes/pitch names 和 per-program JSON data roundtrip；audio `process()` 内 program-change 参数 automation 已本地验证为 realtime-safe 普通参数事件与 atomic 参数更新，不会调用 program apply/data load；真实 host program workflow 仍待外部验证。
 - SysEx data event translation MVP 已本地实现；固定 256-byte payload buffer，`examples/midi-synth` 已展示固定 SysEx level override 的 realtime-safe DSP 消费路径；真实 host SysEx workflow 仍待验证。
 - Note Expression value/int/text event translation、opt-in controller value metadata 和 static physical UI mapping metadata MVP 已本地实现；`examples/midi-synth` 已展示 brightness/tuning expression metadata 与 DSP 消费路径；自定义 expression editor workflow 和 real-host expression workflow 仍待实现。
-- TypeScript package `@vesty/plugin-ui`。
+- TypeScript package `vesty-plugin-ui`。
 - plugin template gallery 已本地实现: `vesty templates` 可列出内置 starter，`vesty new --template <id>` 可选择 gain、midi-synth、Web UI param demo 和 framework-specific starters；真实第三方模板生态仍是后续扩展。
 
 退出条件:

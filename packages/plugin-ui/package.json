@@ -1,7 +1,7 @@
 {
-  "name": "@vesty/plugin-ui",
+  "name": "vesty-plugin-ui",
   "version": "0.1.0",
-  "description": "Framework-agnostic JavaScript bridge SDK for Vesty WebView plugin editors.",
+  "description": "JavaScript bridge SDK and framework adapters for Vesty WebView plugin editors.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",
@@ -32,6 +32,18 @@
     "./protocol/*": {
       "types": "./dist/protocol/*.d.ts",
       "import": "./dist/protocol/*.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "import": "./dist/vue.js"
+    },
+    "./svelte": {
+      "types": "./dist/svelte.d.ts",
+      "import": "./dist/svelte.js"
     }
   },
   "files": [
@@ -40,9 +52,29 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node tests/bridge.test.mjs && node tests/protocol-files.test.mjs"
+    "test": "npm run build && node tests/bridge.test.mjs && node tests/protocol-files.test.mjs && node tests/react.test.mjs && node tests/vue.test.mjs && node tests/svelte.test.mjs"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "svelte": ">=4",
+    "vue": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
   },
   "devDependencies": {
-    "typescript": "^7.0.2"
+    "@types/react": "latest",
+    "react": "latest",
+    "svelte": "latest",
+    "typescript": "^7.0.2",
+    "vue": "latest"
   }
 }

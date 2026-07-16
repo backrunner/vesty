@@ -4,7 +4,7 @@ description: Embed a system WebView and keep parameters host-authoritative.
 order: 3
 ---
 
-Vesty embeds `wry` directly. It does not add a Tauri runtime. The editor can be vanilla JavaScript, React, Vue, or Svelte and communicates through `@vesty/plugin-ui`.
+Vesty embeds `wry` directly. It does not add a Tauri runtime. The editor can be vanilla JavaScript, React, Vue, or Svelte and communicates through `vesty-plugin-ui`.
 
 ## Configure assets
 
@@ -25,7 +25,7 @@ Development uses `dev_url`. Release packaging copies `dist` into the bundle and 
 ## Complete the handshake
 
 ```ts
-import { createBridge } from '@vesty/plugin-ui';
+import { createBridge } from 'vesty-plugin-ui';
 
 const bridge = createBridge(window, 'pending');
 const ready = await bridge.ready();

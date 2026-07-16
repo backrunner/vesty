@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { vestyParamEdit, vestySnapshotStore } from "../dist/index.js";
+import { vestyParamEdit, vestySnapshotStore } from "../dist/svelte.js";
 
 assert.equal(typeof vestyParamEdit, "function");
 assert.equal(typeof vestySnapshotStore, "function");
@@ -36,4 +36,4 @@ assert.equal(typeof vestySnapshotStore, "function");
   ]);
 }
 
-console.log("@vesty/svelte exports ok");
+console.log("vesty-plugin-ui/svelte exports ok");

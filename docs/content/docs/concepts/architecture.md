@@ -15,7 +15,7 @@ DAW / VST3 host
         AudioKernel
              │ fixed-capacity telemetry queues
              ▼
-      BridgeRuntime ─────── system WebView ─────── @vesty/plugin-ui
+      BridgeRuntime ─────── system WebView ─────── vesty-plugin-ui
 ```
 
 The processor and controller are separate VST3 objects. Vesty keeps their shared responsibilities explicit rather than hiding them behind a global mutable singleton.

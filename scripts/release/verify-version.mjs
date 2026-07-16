@@ -1,5 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const tag = process.argv[2];
@@ -27,9 +26,7 @@ for (const pkg of publishableCrates) {
   }
 }
 
-const packageDirectories = readdirSync("packages", { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
-  .map((entry) => join("packages", entry.name, "package.json"));
+const packageDirectories = ["packages/plugin-ui/package.json"];
 
 for (const manifestPath of packageDirectories) {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
@@ -37,12 +34,8 @@ for (const manifestPath of packageDirectories) {
     throw new Error(`${manifest.name} uses ${manifest.version}; release tag requires ${version}`);
   }
 
-  if (manifest.name !== "@vesty/plugin-ui") {
-    const peerVersion = manifest.peerDependencies?.["@vesty/plugin-ui"];
-    const devVersion = manifest.devDependencies?.["@vesty/plugin-ui"];
-    if (peerVersion !== version || devVersion !== version) {
-      throw new Error(`${manifest.name} must pin @vesty/plugin-ui to ${version} in peerDependencies and devDependencies`);
-    }
+  if (manifest.name !== "vesty-plugin-ui") {
+    throw new Error(`${manifestPath} must publish vesty-plugin-ui`);
   }
 }
 

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { useVestyParamEdit, useVestySnapshot } from "../dist/index.js";
+import { useVestyParamEdit, useVestySnapshot } from "../dist/vue.js";
 
 assert.equal(typeof useVestyParamEdit, "function");
 assert.equal(typeof useVestySnapshot, "function");
@@ -36,4 +36,4 @@ assert.equal(typeof useVestySnapshot, "function");
   ]);
 }
 
-console.log("@vesty/vue exports ok");
+console.log("vesty-plugin-ui/vue exports ok");

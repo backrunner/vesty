@@ -491,7 +491,7 @@ pub(super) fn write_ui_template(
 ) -> Result<(), Box<dyn std::error::Error>> {
     fs::write(
         root.join("ui/package.json"),
-        ui_package_json(template, package_paths),
+        ui_package_json(name, template, package_paths),
     )?;
     fs::write(root.join("ui/tsconfig.json"), ui_tsconfig(template))?;
     fs::write(
@@ -897,7 +897,12 @@ pub(super) fn ui_method_template(with_ui: bool) -> &'static str {
     }
 }
 
-pub(super) fn ui_package_json(template: UiTemplate, package_paths: &UiPackagePaths) -> String {
+pub(super) fn ui_package_json(
+    name: &str,
+    template: UiTemplate,
+    package_paths: &UiPackagePaths,
+) -> String {
+    let ui_package_name = format!("{}-editor", sanitize_crate_name(name));
     let plugin_ui_dependency = package_paths
         .plugin_ui
         .as_deref()
@@ -949,7 +954,7 @@ pub(super) fn ui_package_json(template: UiTemplate, package_paths: &UiPackagePat
         }
     };
     r#"{
-  "name": "vesty-plugin-ui",
+  "name": "__PACKAGE_NAME__",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -967,6 +972,7 @@ pub(super) fn ui_package_json(template: UiTemplate, package_paths: &UiPackagePat
   }
 }
 "#
+    .replace("__PACKAGE_NAME__", &ui_package_name)
     .replace("__TYPECHECK_SCRIPT__", typecheck_script)
     .replace("__TYPESCRIPT_DEPENDENCY__", typescript_dependency)
     .replace(
@@ -994,6 +1000,7 @@ pub(super) fn ui_tsconfig(template: UiTemplate) -> String {
   "compilerOptions": {
     "module": "ES2022",
     "moduleResolution": "Bundler",
+    "preserveSymlinks": true,
     "strict": true,
     "target": "ES2022"__JSX__
   },
@@ -1011,7 +1018,11 @@ pub(super) fn ui_vite_config(template: UiTemplate) -> &'static str {
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  plugins: [react()]
+  plugins: [react()],
+  resolve: {
+    dedupe: ["react", "react-dom"],
+    preserveSymlinks: true
+  }
 });
 "#
         }
@@ -1020,7 +1031,11 @@ export default defineConfig({
 import vue from "@vitejs/plugin-vue";
 
 export default defineConfig({
-  plugins: [vue()]
+  plugins: [vue()],
+  resolve: {
+    dedupe: ["vue"],
+    preserveSymlinks: true
+  }
 });
 "#
         }
@@ -1029,7 +1044,11 @@ export default defineConfig({
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 
 export default defineConfig({
-  plugins: [svelte()]
+  plugins: [svelte()],
+  resolve: {
+    dedupe: ["svelte"],
+    preserveSymlinks: true
+  }
 });
 "#
         }
@@ -1080,11 +1099,11 @@ pub(super) fn ui_index_html(name: &str, template: UiTemplate, param: UiParamTemp
 pub(super) fn ui_index_ts(param: UiParamTemplate) -> String {
     r##"import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from "vesty-plugin-ui";
 
-pub(super) const bridge = createBridge();
-pub(super) const control = document.querySelector<HTMLInputElement>("#__PARAM_ID__");
-pub(super) const value = document.querySelector<HTMLOutputElement>("#value");
-pub(super) const PARAM_ID = "__PARAM_ID__";
-pub(super) const PARAM_DEFAULT = __PARAM_DEFAULT__;
+const bridge = createBridge();
+const control = document.querySelector<HTMLInputElement>("#__PARAM_ID__");
+const value = document.querySelector<HTMLOutputElement>("#value");
+const PARAM_ID = "__PARAM_ID__";
+const PARAM_DEFAULT = __PARAM_DEFAULT__;
 let editing = false;
 
 function clampNormalized(value: unknown, fallback = PARAM_DEFAULT) {
@@ -1162,8 +1181,8 @@ pub(super) fn ui_react_app_tsx(param: UiParamTemplate) -> String {
 import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from "vesty-plugin-ui";
 import { VestyBridgeProvider, useVestyBridge, useVestyParamEdit } from "vesty-plugin-ui/react";
 
-pub(super) const PARAM_ID = "__PARAM_ID__";
-pub(super) const PARAM_DEFAULT = __PARAM_DEFAULT__;
+const PARAM_ID = "__PARAM_ID__";
+const PARAM_DEFAULT = __PARAM_DEFAULT__;
 
 function clampNormalized(value: unknown, fallback = PARAM_DEFAULT) {
   return typeof value === "number" && Number.isFinite(value)
@@ -1280,12 +1299,12 @@ import { onMounted, onScopeDispose, ref } from "vue";
 import { createBridge, type BridgeReadyPayload, type ParamChangedEvent } from "vesty-plugin-ui";
 import { useVestyParamEdit } from "vesty-plugin-ui/vue";
 
-pub(super) const bridge = createBridge();
-pub(super) const PARAM_ID = "__PARAM_ID__";
-pub(super) const PARAM_DEFAULT = __PARAM_DEFAULT__;
-pub(super) const param = useVestyParamEdit(PARAM_ID, bridge);
-pub(super) const normalized = ref(PARAM_DEFAULT);
-pub(super) const name = ref("Vesty");
+const bridge = createBridge();
+const PARAM_ID = "__PARAM_ID__";
+const PARAM_DEFAULT = __PARAM_DEFAULT__;
+const param = useVestyParamEdit(PARAM_ID, bridge);
+const normalized = ref(PARAM_DEFAULT);
+const name = ref("Vesty");
 let editing = false;
 let unsubscribeParamChanged: (() => void) | undefined;
 

@@ -5,8 +5,7 @@ use ts_rs::TS;
 use vesty_params::ParamSpec;
 
 use crate::{
-    MAX_HELLO_JS_PACKAGE_VERSION_BYTES, MAX_HELLO_PAGE_URL_BYTES,
-    MAX_HELLO_PROTOCOL_VERSIONS,
+    MAX_HELLO_JS_PACKAGE_VERSION_BYTES, MAX_HELLO_PAGE_URL_BYTES, MAX_HELLO_PROTOCOL_VERSIONS,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, TS, PartialEq)]

@@ -11,11 +11,11 @@ use raw_window_handle::Win32WindowHandle;
 ))]
 use raw_window_handle::XlibWindowHandle;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle, WindowHandle};
-use vesty_ui::UiError;
 #[cfg(target_os = "windows")]
 use std::num::NonZeroIsize;
 #[cfg(target_os = "macos")]
 use std::{ffi::c_void, ptr::NonNull};
+use vesty_ui::UiError;
 
 #[cfg(feature = "wry-backend")]
 #[derive(Clone, Copy, Debug)]

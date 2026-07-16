@@ -2105,6 +2105,3 @@
                     .is_some_and(|source| release_report_path_ends_with(source, "notes.txt"))
         }));
     }
-
-
-

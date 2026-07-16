@@ -1962,4 +1962,3 @@ license: MIT
         assert!(check.value.contains("protocol snapshot"));
         assert!(check.value.contains("unexpected value"));
     }
-

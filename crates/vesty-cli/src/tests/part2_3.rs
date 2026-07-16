@@ -1652,4 +1652,3 @@
         assert!(complete.value.contains("macOS"));
         assert!(complete.value.contains("Windows"));
     }
-

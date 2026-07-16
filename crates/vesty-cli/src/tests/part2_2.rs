@@ -2217,4 +2217,3 @@ packet: {"lane":"meter","type":"meter.main","payload":{"peaks":[0.75],"rms":[0.5
             .to_string();
         assert!(error.contains("has no items"));
     }
-

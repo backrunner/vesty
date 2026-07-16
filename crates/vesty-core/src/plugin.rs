@@ -1,10 +1,10 @@
 use vesty_params::ParamCollection;
 
 use crate::{
-    AudioOutputBus, DEFAULT_AUDIO_OUTPUT_BUSES, HostChangeFlags, KernelInit, PluginInfo,
-    NoteExpressionPhysicalUiMapping, NoteExpressionValueType, PrepareContext, ProcessContext,
-    ProcessContext64, ProcessResult, ProgramAttribute, ProgramList, ProgramPitchName, StateError,
-    UiDescriptor,
+    AudioOutputBus, DEFAULT_AUDIO_OUTPUT_BUSES, HostChangeFlags, KernelInit,
+    NoteExpressionPhysicalUiMapping, NoteExpressionValueType, PluginInfo, PrepareContext,
+    ProcessContext, ProcessContext64, ProcessResult, ProgramAttribute, ProgramList,
+    ProgramPitchName, StateError, UiDescriptor,
 };
 
 pub trait AudioKernel: Send + 'static {

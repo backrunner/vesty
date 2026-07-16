@@ -2,13 +2,13 @@ use camino::{Utf8Path, Utf8PathBuf};
 use std::fs;
 
 use crate::{
-    AssetManifest, BuildError, BundlePlatform, ModuleClassInfo, ModuleInfo, PARAMETER_MANIFEST_FILE,
-    PackageOptions, PackageReport, VestyConfig, binary_relative_path, canonical_utf8,
-    copy_file_no_symlink, create_directory_no_parent_or_leaf_symlink, fallback_bundle_id,
-    read_parameter_manifest, real_directory_exists_no_symlink, remove_existing_output_directory,
-    require_real_directory, require_real_file, sanitize_bundle_name, serde_json_pretty,
-    validate_binary_format, validate_config, write_bytes_file_no_symlink,
-    write_text_file_no_symlink,
+    AssetManifest, BuildError, BundlePlatform, ModuleClassInfo, ModuleInfo,
+    PARAMETER_MANIFEST_FILE, PackageOptions, PackageReport, VestyConfig, binary_relative_path,
+    canonical_utf8, copy_file_no_symlink, create_directory_no_parent_or_leaf_symlink,
+    fallback_bundle_id, read_parameter_manifest, real_directory_exists_no_symlink,
+    remove_existing_output_directory, require_real_directory, require_real_file,
+    sanitize_bundle_name, serde_json_pretty, validate_binary_format, validate_config,
+    write_bytes_file_no_symlink, write_text_file_no_symlink,
 };
 
 pub fn package_vst3(

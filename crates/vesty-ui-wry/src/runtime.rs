@@ -6,12 +6,10 @@ use vesty_ipc::{
 };
 use vesty_ui::{EditorRuntime, EditorSize, UiDescriptor, UiError};
 
-use crate::{
-    NativeParent, WryBridgeError, batch_scripts, bootstrap_script, packet_script,
-};
 use crate::assets::{
     asset_response, load_asset_manifest, release_ipc_allowed, release_navigation_allowed,
 };
+use crate::{NativeParent, WryBridgeError, batch_scripts, bootstrap_script, packet_script};
 
 #[cfg(feature = "wry-backend")]
 pub(crate) type IpcHandler = Rc<dyn Fn(String) -> Vec<BridgePacket>>;

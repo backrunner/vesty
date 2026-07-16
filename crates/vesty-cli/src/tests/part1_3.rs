@@ -1110,8 +1110,8 @@ unreviewed = "9.9.9"
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "npm registry latest `vue`"
-                && check.expected == "3.5.39"
-                && check.actual.as_deref() == Some("3.5.39")
+                && check.expected == "3.5.40"
+                && check.actual.as_deref() == Some("3.5.40")
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "npm registry latest `svelte`"

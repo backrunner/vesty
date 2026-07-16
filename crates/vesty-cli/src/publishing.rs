@@ -754,7 +754,7 @@ pub(super) const REQUIRED_JS_LATEST_BASELINE_DEPENDENCIES: &[JsLatestBaselineDep
         dependency: "vue",
         node_package_path: "node_modules/vue",
         expected_range: "latest",
-        expected_lock_version: "3.5.39",
+        expected_lock_version: "3.5.40",
     },
     JsLatestBaselineDependency {
         workspace_package: "plugin-ui",

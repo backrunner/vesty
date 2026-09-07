@@ -1,0 +1,88 @@
+use super::*;
+
+fn setup() -> (__PLUGIN__, __KERNEL__) {
+    let plugin = __PLUGIN__::default();
+    let kernel = plugin.create_kernel(KernelInit {
+        sample_rate: 48_000.0,
+        max_block_size: 32,
+    });
+    (plugin, kernel)
+}
+
+fn render<const N: usize>(
+    plugin: &__PLUGIN__,
+    kernel: &mut __KERNEL__,
+    events: &[Event],
+) -> [f32; N] {
+    let mut output = [9.0; N];
+    let mut outputs: [&mut [f32]; 1] = [&mut output];
+    let audio = AudioBuffers::new(&[], &mut outputs);
+    let mut context = ProcessContext::new(audio, plugin.params(), events, Transport::default());
+    assert_eq!(kernel.process(&mut context), ProcessResult::Continue);
+    output
+}
+
+fn on(offset: u32, channel: u16, key: u8, note_id: i32) -> Event {
+    Event::NoteOn { sample_offset: offset, channel, key, note_id, velocity: 1.0 }
+}
+
+fn off(offset: u32, channel: u16, key: u8, note_id: i32) -> Event {
+    Event::NoteOff { sample_offset: offset, channel, key, note_id, velocity: 0.0 }
+}
+
+#[test]
+fn notes_and_automation_follow_sample_offsets() {
+    let (plugin, mut kernel) = setup();
+    let events = [
+        on(4, 0, 69, 7),
+        Event::Param {
+            sample_offset: 8,
+            handle: plugin.params.resolve_or_invalid("volume"),
+            id_hash: 0,
+            normalized: 0.5,
+        },
+        off(12, 0, 69, 7),
+    ];
+    let output = render::<16>(&plugin, &mut kernel, &events);
+    assert_eq!(&output[..4], &[0.0; 4]);
+    for (frame, actual) in output.iter().enumerate().take(12).skip(4) {
+        let volume = if frame < 8 { 0.2 } else { 0.5 };
+        let expected = ((frame - 4) as f32 * 440.0 / 48_000.0 * std::f32::consts::TAU).sin() * volume;
+        assert!((actual - expected).abs() < 1e-6);
+    }
+    assert_eq!(&output[12..], &[0.0; 4]);
+}
+
+#[test]
+fn unrelated_note_off_does_not_release_current_voice() {
+    let (plugin, mut kernel) = setup();
+    render::<0>(&plugin, &mut kernel, &[on(0, 1, 60, 11), on(0, 1, 72, 12)]);
+    render::<0>(&plugin, &mut kernel, &[off(0, 1, 60, 11), off(0, 2, 72, 12)]);
+    assert!(render::<8>(&plugin, &mut kernel, &[]).iter().any(|s| *s != 0.0));
+    render::<0>(&plugin, &mut kernel, &[off(0, 1, 72, 12)]);
+    assert_eq!(render::<8>(&plugin, &mut kernel, &[]), [0.0; 8]);
+}
+
+#[test]
+fn zero_velocity_and_missing_note_ids_use_channel_and_key() {
+    let (plugin, mut kernel) = setup();
+    render::<0>(&plugin, &mut kernel, &[on(0, 0, 69, -1), off(0, 0, 60, -1)]);
+    assert!(render::<8>(&plugin, &mut kernel, &[]).iter().any(|s| *s != 0.0));
+    render::<0>(&plugin, &mut kernel, &[Event::NoteOn {
+        sample_offset: 0, channel: 0, key: 69, note_id: -1, velocity: 0.0,
+    }]);
+    assert_eq!(render::<8>(&plugin, &mut kernel, &[]), [0.0; 8]);
+}
+
+#[test]
+fn pitch_sample_rate_and_reset_affect_rendered_audio() {
+    let (plugin, mut kernel) = setup();
+    kernel.prepare(PrepareContext { sample_rate: 96_000.0, max_block_size: 32 });
+    let output = render::<8>(&plugin, &mut kernel, &[on(0, 0, 81, -1)]);
+    let expected = (880.0_f32 / 96_000.0 * std::f32::consts::TAU).sin() * 0.2;
+    assert!((output[1] - expected).abs() < 1e-6);
+    kernel.reset();
+    assert_eq!(render::<8>(&plugin, &mut kernel, &[]), [0.0; 8]);
+    assert_eq!(render::<8>(&plugin, &mut kernel, &[on(0, 0, 81, -1)]), output);
+}
+

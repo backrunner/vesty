@@ -618,10 +618,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             no_ui,
         } => {
             let release_mode = build_release_mode(debug, release)?;
-            let project_dir = config
-                .parent()
-                .map(|path| path.to_path_buf())
-                .unwrap_or_else(|| Utf8PathBuf::from("."));
+            let project_dir = config_project_dir(&config).to_path_buf();
             let config = read_config(&config)?;
             println!(
                 "building {} {} ({})",
@@ -656,10 +653,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             vst3_dir,
             install_mode,
         } => {
-            let project_dir = config
-                .parent()
-                .map(|path| path.to_path_buf())
-                .unwrap_or_else(|| Utf8PathBuf::from("."));
+            let project_dir = config_project_dir(&config).to_path_buf();
             let config = read_config(&config)?;
             let platform = resolve_bundle_platform(platform.as_deref())?;
             let report = package_vst3(

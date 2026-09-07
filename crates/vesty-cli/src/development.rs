@@ -614,12 +614,15 @@ pub(super) struct DevOptions {
     pub(super) install_mode: String,
 }
 
-pub(super) fn run_dev(options: DevOptions) -> Result<(), Box<dyn std::error::Error>> {
-    let project_dir = options
-        .config_path
+pub(super) fn config_project_dir(config_path: &Utf8Path) -> &Utf8Path {
+    config_path
         .parent()
-        .map(|path| path.to_path_buf())
-        .unwrap_or_else(|| Utf8PathBuf::from("."));
+        .filter(|parent| !parent.as_str().is_empty())
+        .unwrap_or_else(|| Utf8Path::new("."))
+}
+
+pub(super) fn run_dev(options: DevOptions) -> Result<(), Box<dyn std::error::Error>> {
+    let project_dir = config_project_dir(&options.config_path).to_path_buf();
     let config = read_config(&options.config_path)?;
 
     println!("dev: {}", config.plugin.name);

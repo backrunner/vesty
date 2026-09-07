@@ -1408,7 +1408,7 @@ bridge timeout
         assert!(instrument.contains("volume: self.params.resolve_or_invalid(\"volume\")"));
         assert!(!instrument.contains(".resolve(\"volume\").expect("));
         assert!(!instrument.contains(".resolve(\"volume\").unwrap("));
-        assert!(instrument.contains("ParamAutomationSegments::new(events, self.volume"));
+        assert!(instrument.contains("self.render(audio, cursor, offset, volume)"));
         assert!(instrument.contains("context.param_normalized(self.volume)"));
         assert!(instrument.contains(".with_size(900, 560)"));
         assert!(instrument.contains(".with_min_size(640, 420)"));
@@ -1418,14 +1418,16 @@ bridge timeout
 
     #[test]
     fn cargo_template_can_use_local_vesty_path() {
-        let published = cargo_toml("Demo Plugin", "demo", None);
-        assert!(published.contains(&format!(r#"vesty = "={}""#, env!("CARGO_PKG_VERSION"))));
+        let published = cargo_toml("Demo Plugin", "demo", None, false);
+        assert!(published.contains(&format!(r#"version = "={}""#, env!("CARGO_PKG_VERSION"))));
+        assert!(published.contains(r#"default-features = false, features = ["vst3-bindings"]"#));
         assert!(published.contains("[workspace]"));
         assert!(published.contains("publish = false"));
         assert!(published.contains(r#"description = "Demo Plugin VST3 plugin""#));
 
-        let local = cargo_toml("Demo Plugin", "demo", Some(Utf8Path::new("/tmp/vesty")));
-        assert!(local.contains(r#"vesty = { path = "/tmp/vesty" }"#));
+        let local = cargo_toml("Demo Plugin", "demo", Some(Utf8Path::new("/tmp/vesty")), true);
+        assert!(local.contains(r#"path = "/tmp/vesty""#));
+        assert!(local.contains(r#"features = ["vst3-wry-ui"]"#));
     }
 
     #[test]
@@ -2010,4 +2012,11 @@ parameter_manifest = "vesty-parameters.json"
             min_width: None,
             min_height: None,
         }
+    }
+    #[test]
+    fn bare_config_filename_uses_current_directory() {
+        assert_eq!(config_project_dir(Utf8Path::new("vesty.toml")), ".");
+        assert_eq!(config_project_dir(Utf8Path::new("./vesty.toml")), ".");
+        assert_eq!(config_project_dir(Utf8Path::new("plugin/vesty.toml")), "plugin");
+        assert_eq!(config_project_dir(Utf8Path::new("/tmp/plugin/vesty.toml")), "/tmp/plugin");
     }

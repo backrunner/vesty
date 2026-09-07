@@ -2,6 +2,92 @@ use super::*;
 use vesty_params::{ParamHandle, ParamSpec};
 
 #[test]
+fn event_sort_matches_stable_reference_for_dense_and_duplicate_offsets() {
+    let mut random = 17_u32;
+    for len in [0, 1, 2, 3, 8, 64, MAX_BLOCK_EVENTS] {
+        for _ in 0..16 {
+            let mut events = FixedEventList::new();
+            for index in 0..len {
+                random = random.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                events
+                    .push(VestyEvent::NoteOn {
+                        sample_offset: (random >> 16) % 32,
+                        channel: 0,
+                        key: 60,
+                        velocity: 1.0,
+                        note_id: index as i32,
+                    })
+                    .unwrap();
+            }
+            let mut expected = events.as_slice().to_vec();
+            expected.sort_by_key(VestyEvent::sample_offset);
+            sort_events_by_sample_offset(&mut events);
+            assert_eq!(events.as_slice(), expected);
+        }
+    }
+}
+
+#[test]
+#[ignore = "manual release-mode event sorting benchmark"]
+fn event_sort_benchmark() {
+    use std::hint::black_box;
+    use std::time::Instant;
+
+    fn insertion_sort(events: &mut FixedEventList<VestyEvent, MAX_BLOCK_EVENTS>) {
+        let items = events.as_mut_slice();
+        for index in 1..items.len() {
+            let mut cursor = index;
+            while cursor > 0 && items[cursor - 1].sample_offset() > items[cursor].sample_offset() {
+                items.swap(cursor - 1, cursor);
+                cursor -= 1;
+            }
+        }
+    }
+
+    for len in [8, 64, MAX_BLOCK_EVENTS] {
+        for shape in ["sorted", "interleaved", "reverse"] {
+            let mut seed = FixedEventList::new();
+            for index in 0..len {
+                let offset = match shape {
+                    "sorted" => index,
+                    "interleaved" => index % (len / 4),
+                    _ => len - index,
+                };
+                seed.push(VestyEvent::NoteOn {
+                    sample_offset: offset as u32,
+                    channel: 0,
+                    key: 60,
+                    velocity: 1.0,
+                    note_id: index as i32,
+                })
+                .unwrap();
+            }
+            for (name, sort) in [
+                (
+                    "insertion",
+                    insertion_sort as fn(&mut FixedEventList<VestyEvent, MAX_BLOCK_EVENTS>),
+                ),
+                ("indices", sort_events_by_sample_offset),
+            ] {
+                let mut work = seed.clone();
+                let iterations = 2_000;
+                let start = Instant::now();
+                for _ in 0..iterations {
+                    work.as_mut_slice()
+                        .copy_from_slice(black_box(seed.as_slice()));
+                    sort(black_box(&mut work));
+                    black_box(work.as_slice());
+                }
+                eprintln!(
+                    "{name} {len} {shape}: {:.3} us/block",
+                    start.elapsed().as_secs_f64() * 1e6 / iterations as f64
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn vst3_state_migration_accepts_v1_and_rejects_future_versions() {
     let state = Vst3State {
         version: VST3_STATE_VERSION,

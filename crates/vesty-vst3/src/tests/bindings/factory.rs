@@ -196,6 +196,14 @@ fn controller_exposes_opt_in_midi_mapping() {
             mapping.getMidiControllerAssignment(0, -1, 7, &mut id),
             kResultFalse
         );
+        for channel in [16, i16::MAX] {
+            id = ParamID::MAX;
+            assert_eq!(
+                mapping.getMidiControllerAssignment(0, channel, 7, &mut id),
+                kResultFalse
+            );
+            assert_eq!(id, ParamID::MAX);
+        }
         assert_eq!(
             mapping.getMidiControllerAssignment(0, 0, -1, &mut id),
             kResultFalse

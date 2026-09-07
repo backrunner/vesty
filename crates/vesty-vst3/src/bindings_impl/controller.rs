@@ -934,7 +934,7 @@ impl<P: Plugin + Default> VestyController<P> {
         channel: int16,
         midi_controller_number: CtrlNumber,
     ) -> Option<ParamID> {
-        if bus_index != 0 || channel < 0 || midi_controller_number < 0 {
+        if bus_index != 0 || !(0..=15).contains(&channel) || midi_controller_number < 0 {
             return None;
         }
         let channel = channel as u16;
@@ -1132,6 +1132,9 @@ impl<P: Plugin + Default> VestyController<P> {
 
     #[allow(dead_code)]
     pub(crate) unsafe fn perform_param_edit(&self, id: ParamID, normalized: f64) -> tresult {
+        if !normalized.is_finite() {
+            return kInvalidArgument;
+        }
         // SAFETY: This block isolates raw host pointers/COM calls inside the VST3 adapter boundary; callers uphold the enclosing unsafe callback contract and nullable pointers are checked before use.
         unsafe {
             let Some((_, spec)) = self.spec_for_host_id(id) else {
@@ -1816,6 +1819,9 @@ impl<P: Plugin + Default> IEditControllerTrait for VestyController<P> {
     }
 
     unsafe fn setParamNormalized(&self, id: u32, value: f64) -> tresult {
+        if !value.is_finite() {
+            return kInvalidArgument;
+        }
         // SAFETY: This block isolates raw host pointers/COM calls inside the VST3 adapter boundary; callers uphold the enclosing unsafe callback contract and nullable pointers are checked before use.
         unsafe {
             let Some((_, spec)) = self.spec_for_host_id(id) else {

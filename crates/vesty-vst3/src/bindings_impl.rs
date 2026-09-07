@@ -50,6 +50,7 @@ use vesty_ui::{EditorRuntime, EditorSize};
 use vesty_ui_wry::{NativeParent, WryEditorRuntime};
 use vst3::{Class, ComPtr, ComRef, ComWrapper, Steinberg::Vst::*, Steinberg::*};
 
+// Per-batch storage budget, not a limit on the total events in a host block.
 const MAX_BLOCK_EVENTS: usize = 512;
 const MAX_SETUP_BLOCK_SIZE: usize = 1 << 20;
 const MAX_MAIN_IO_CHANNELS: usize = 2;
@@ -142,27 +143,37 @@ fn event_sample_offset(event: &VestyEvent) -> u32 {
 
 fn sort_events_by_sample_offset(events: &mut FixedEventList<VestyEvent, MAX_BLOCK_EVENTS>) {
     let items = events.as_mut_slice();
-    for index in 1..items.len() {
-        let mut cursor = index;
-        while cursor > 0
-            && event_sample_offset(&items[cursor - 1]) > event_sample_offset(&items[cursor])
-        {
-            items.swap(cursor - 1, cursor);
-            cursor -= 1;
+    if items.is_sorted_by_key(event_sample_offset) {
+        return;
+    }
+
+    // Sort small indices rather than repeatedly moving events with inline SysEx/text payloads.
+    // The original index breaks ties, preserving host order without an allocating stable sort.
+    let mut order = [0_usize; MAX_BLOCK_EVENTS];
+    let order = &mut order[..items.len()];
+    for (index, slot) in order.iter_mut().enumerate() {
+        *slot = index;
+    }
+    order.sort_unstable_by_key(|index| (event_sample_offset(&items[*index]), *index));
+
+    // Apply the new-position -> old-position permutation in cycles, moving each event once.
+    for start in 0..items.len() {
+        if order[start] == start {
+            continue;
+        }
+        let saved = items[start];
+        let mut destination = start;
+        loop {
+            let source = order[destination];
+            order[destination] = destination;
+            if source == start {
+                items[destination] = saved;
+                break;
+            }
+            items[destination] = items[source];
+            destination = source;
         }
     }
-}
-
-fn clamp_midi_channel_i16(channel: i16) -> u16 {
-    channel.clamp(0, 15) as u16
-}
-
-fn clamp_midi_channel_i8(channel: i8) -> u16 {
-    channel.clamp(0, 15) as u16
-}
-
-fn clamp_midi_key(key: i16) -> u8 {
-    key.clamp(0, 127) as u8
 }
 
 fn clamp_midi7_i8(value: i8) -> u8 {
@@ -775,10 +786,12 @@ unsafe fn write_stream_bytes(stream: *mut IBStream, bytes: &[u8]) -> Result<(), 
 }
 
 mod controller;
+mod event_batch;
 mod factory;
 mod processor;
 
 pub(crate) use controller::*;
+use event_batch::*;
 pub use factory::create_plugin_factory;
 pub(crate) use processor::*;
 

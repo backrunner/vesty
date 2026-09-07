@@ -1,6 +1,36 @@
 use super::*;
 
 #[test]
+fn controller_rejects_non_finite_parameter_values_and_text() {
+    let controller = crate::bindings_impl::VestyController::<TestPlugin>::new();
+    let gain_id = controller.param_id_for_test(0).unwrap();
+    // SAFETY: The controller is local and UTF-16 strings and output pointers remain valid.
+    unsafe {
+        assert_eq!(controller.setParamNormalized(gain_id, 0.25), kResultOk);
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(
+                controller.setParamNormalized(gain_id, value),
+                kInvalidArgument
+            );
+            assert_eq!(
+                controller.perform_param_edit(gain_id, value),
+                kInvalidArgument
+            );
+            assert_eq!(controller.getParamNormalized(gain_id), 0.25);
+        }
+        for text in ["NaN", "inf", "-inf"] {
+            let mut text = wide_cstring(text);
+            let mut value = 0.25;
+            assert_eq!(
+                controller.getParamValueByString(gain_id, text.as_mut_ptr(), &mut value),
+                kInvalidArgument
+            );
+            assert_eq!(value, 0.25);
+        }
+    }
+}
+
+#[test]
 fn controller_notifies_host_when_latency_affecting_param_changes() {
     // SAFETY: Test code is exercising fake VST3/COM objects and raw callback entrypoints with fixtures constructed in this module.
     unsafe {

@@ -229,6 +229,7 @@ fn normalized_for_program_index(program_index: usize) -> f64 {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct ActiveNote {
+    channel: u16,
     key: u8,
     note_id: i32,
 }
@@ -244,6 +245,10 @@ pub struct SynthKernel {
 }
 
 impl AudioKernel for SynthKernel {
+    fn prepare(&mut self, context: PrepareContext) {
+        self.sample_rate = context.sample_rate;
+    }
+
     fn reset(&mut self) {
         self.phase = 0.0;
         self.active_note = None;
@@ -253,97 +258,150 @@ impl AudioKernel for SynthKernel {
     }
 
     fn process(&mut self, context: &mut ProcessContext<'_>) -> ProcessResult {
-        for event in context.events() {
-            match event {
-                Event::NoteOn {
-                    key,
-                    velocity,
-                    note_id,
-                    ..
-                } if *velocity > 0.0 => {
-                    self.active_note = Some(ActiveNote {
-                        key: *key,
-                        note_id: *note_id,
-                    });
-                    self.brightness = DEFAULT_BRIGHTNESS;
-                    self.tuning_cents = DEFAULT_TUNING_CENTS;
-                }
-                Event::NoteOff { key, note_id, .. }
-                    if note_off_matches_active(self.active_note, *key, *note_id) =>
-                {
-                    self.active_note = None
-                }
-                Event::SysEx {
-                    data_len,
-                    data,
-                    truncated,
-                    ..
-                } => {
-                    if let Some(level) = sysex_level_override(data, *data_len, *truncated) {
-                        self.sysex_level_override = Some(level);
-                    }
-                }
-                Event::NoteExpressionValue {
-                    type_id,
-                    note_id,
-                    value,
-                    ..
-                } if note_expression_targets_active(self.active_note, *note_id)
-                    && value.is_finite() =>
-                {
-                    match *type_id {
-                        note_expression::BRIGHTNESS => {
-                            self.brightness = (*value).clamp(0.0, 1.0) as f32;
-                        }
-                        note_expression::TUNING => {
-                            self.tuning_cents =
-                                (((*value).clamp(0.0, 1.0) - 0.5) * TUNING_RANGE_CENTS) as f32;
-                        }
-                        _ => {}
-                    }
-                }
-                _ => {}
-            }
-        }
-
         context.audio_mut().clear_outputs();
-        let Some(note) = self.active_note else {
+        let mut level = context.param_normalized(self.level).unwrap_or(0.5);
+        let (audio, events) = context.audio_mut_and_events();
+        let frames = audio.frames();
+        if frames == 0 {
+            for event in events {
+                self.apply_event(event, &mut level);
+            }
             return ProcessResult::Continue;
+        }
+        let mut cursor = 0;
+        for event in events {
+            let offset = event.sample_offset() as usize;
+            if offset >= frames {
+                break;
+            }
+            self.render_segment(audio, cursor, offset, level);
+            cursor = offset;
+            self.apply_event(event, &mut level);
+        }
+        self.render_segment(audio, cursor, frames, level);
+        ProcessResult::Continue
+    }
+}
+
+impl SynthKernel {
+    fn apply_event(&mut self, event: &Event, level: &mut f64) {
+        match event {
+            Event::NoteOn {
+                channel,
+                key,
+                velocity,
+                note_id,
+                ..
+            } if velocity.is_finite() && *velocity > 0.0 => {
+                self.active_note = Some(ActiveNote {
+                    channel: *channel,
+                    key: *key,
+                    note_id: *note_id,
+                });
+                self.brightness = DEFAULT_BRIGHTNESS;
+                self.tuning_cents = DEFAULT_TUNING_CENTS;
+            }
+            Event::NoteOff {
+                channel,
+                key,
+                note_id,
+                ..
+            } if note_off_matches_active(self.active_note, *channel, *key, *note_id) => {
+                self.active_note = None
+            }
+            Event::NoteOn {
+                channel,
+                key,
+                note_id,
+                velocity,
+                ..
+            } if *velocity == 0.0
+                && note_off_matches_active(self.active_note, *channel, *key, *note_id) =>
+            {
+                self.active_note = None;
+            }
+            Event::Param {
+                handle, normalized, ..
+            } if *handle == self.level && normalized.is_finite() => {
+                *level = normalized.clamp(0.0, 1.0);
+            }
+            Event::SysEx {
+                data_len,
+                data,
+                truncated,
+                ..
+            } => {
+                if let Some(level) = sysex_level_override(data, *data_len, *truncated) {
+                    self.sysex_level_override = Some(level);
+                }
+            }
+            Event::NoteExpressionValue {
+                type_id,
+                note_id,
+                value,
+                ..
+            } if note_expression_targets_active(self.active_note, *note_id)
+                && value.is_finite() =>
+            {
+                match *type_id {
+                    note_expression::BRIGHTNESS => {
+                        self.brightness = (*value).clamp(0.0, 1.0) as f32;
+                    }
+                    note_expression::TUNING => {
+                        self.tuning_cents =
+                            (((*value).clamp(0.0, 1.0) - 0.5) * TUNING_RANGE_CENTS) as f32;
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn render_segment(
+        &mut self,
+        audio: &mut AudioBuffers<'_>,
+        start: usize,
+        end: usize,
+        level: f64,
+    ) {
+        if start >= end {
+            return;
+        }
+        let Some(note) = self.active_note else {
+            return;
         };
 
-        let initial_level = context.param_normalized(self.level).unwrap_or(0.5);
         let frequency = 440.0_f32
             * 2.0_f32.powf((note.key as f32 - 69.0) / 12.0)
             * 2.0_f32.powf(self.tuning_cents / 1200.0);
         let increment = frequency / self.sample_rate as f32;
         let brightness = self.brightness.clamp(0.0, 1.0);
-        let frames = context.audio().frames().min(u32::MAX as usize) as u32;
-        let outputs = context.audio().output_channels();
-        let (audio, events) = context.audio_mut_and_events();
-
-        for segment in ParamAutomationSegments::new(events, self.level, initial_level, frames) {
-            let normalized_level = self
-                .sysex_level_override
-                .unwrap_or(segment.normalized as f32);
-            let gain = normalized_level * 0.1;
-            for frame in segment.start_sample as usize..segment.end_sample as usize {
-                self.phase = (self.phase + increment) % 1.0;
-                let fundamental = (self.phase * std::f32::consts::TAU).sin();
-                let harmonic = (self.phase * std::f32::consts::TAU * 2.0).sin();
-                let sample =
-                    (fundamental * (1.0 - brightness * 0.35) + harmonic * brightness * 0.35) * gain;
-                for channel in 0..outputs {
-                    audio.set_output_sample(channel, frame, sample);
-                }
+        let outputs = audio.output_channels();
+        let normalized_level = self.sysex_level_override.unwrap_or(level as f32);
+        let gain = normalized_level * 0.1;
+        for frame in start..end {
+            self.phase = (self.phase + increment) % 1.0;
+            let fundamental = (self.phase * std::f32::consts::TAU).sin();
+            let harmonic = (self.phase * std::f32::consts::TAU * 2.0).sin();
+            let sample =
+                (fundamental * (1.0 - brightness * 0.35) + harmonic * brightness * 0.35) * gain;
+            for channel in 0..outputs {
+                audio.set_output_sample(channel, frame, sample);
             }
         }
-
-        ProcessResult::Continue
     }
 }
 
-fn note_off_matches_active(active: Option<ActiveNote>, key: u8, note_id: i32) -> bool {
-    active.is_some_and(|note| note.key == key && (note.note_id == note_id || note_id < 0))
+fn note_off_matches_active(
+    active: Option<ActiveNote>,
+    channel: u16,
+    key: u8,
+    note_id: i32,
+) -> bool {
+    active.is_some_and(|note| {
+        note.channel == channel && note.key == key && (note.note_id == note_id || note_id < 0)
+    })
 }
 
 fn note_expression_targets_active(active: Option<ActiveNote>, note_id: i32) -> bool {
@@ -370,6 +428,198 @@ vesty::export_vst3!(SynthPlugin);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn render(
+        kernel: &mut SynthKernel,
+        params: &SynthParams,
+        events: &[Event],
+        frames: usize,
+    ) -> Vec<f32> {
+        let mut output = vec![0.0; frames];
+        let mut outputs = [output.as_mut_slice()];
+        let mut context = ProcessContext::new(
+            AudioBuffers::new(&[], &mut outputs),
+            params,
+            events,
+            Transport::default(),
+        );
+        assert_eq!(kernel.process(&mut context), ProcessResult::Continue);
+        output
+    }
+
+    #[test]
+    fn midi_and_automation_timing_is_independent_of_block_size() {
+        let plugin = SynthPlugin::default();
+        let init = KernelInit {
+            sample_rate: 48_000.0,
+            max_block_size: 16,
+        };
+        let mut whole = plugin.create_kernel(init);
+        let mut split = plugin.create_kernel(init);
+        let mut sysex = [0; MAX_SYSEX_BYTES];
+        sysex[..4].copy_from_slice(&[0xF0, SYSEX_EXPERIMENTAL_ID, 64, 0xF7]);
+        let events = [
+            Event::NoteOn {
+                sample_offset: 3,
+                channel: 0,
+                key: 69,
+                velocity: 1.0,
+                note_id: 1,
+            },
+            Event::Param {
+                sample_offset: 5,
+                handle: whole.level,
+                id_hash: 0,
+                normalized: 0.8,
+            },
+            Event::NoteExpressionValue {
+                sample_offset: 6,
+                type_id: note_expression::BRIGHTNESS,
+                note_id: 1,
+                value: 0.9,
+            },
+            Event::SysEx {
+                sample_offset: 7,
+                data_len: 4,
+                data: sysex,
+                truncated: false,
+            },
+            Event::NoteOff {
+                sample_offset: 10,
+                channel: 0,
+                key: 69,
+                velocity: 0.0,
+                note_id: 1,
+            },
+        ];
+        let actual = render(&mut whole, plugin.params(), &events, 16);
+        let mut expected = Vec::new();
+        for frame in 0..16 {
+            let frame_events: Vec<_> = events
+                .iter()
+                .copied()
+                .filter(|event| event.sample_offset() == frame)
+                .map(|mut event| {
+                    match &mut event {
+                        Event::NoteOn { sample_offset, .. }
+                        | Event::NoteOff { sample_offset, .. }
+                        | Event::Param { sample_offset, .. }
+                        | Event::SysEx { sample_offset, .. }
+                        | Event::NoteExpressionValue { sample_offset, .. } => *sample_offset = 0,
+                        _ => unreachable!(),
+                    }
+                    event
+                })
+                .collect();
+            expected.extend(render(&mut split, plugin.params(), &frame_events, 1));
+            for event in frame_events {
+                if let Event::Param {
+                    handle, normalized, ..
+                } = event
+                {
+                    plugin
+                        .params()
+                        .set_normalized_by_handle(handle, normalized)
+                        .unwrap();
+                }
+            }
+        }
+        assert_eq!(actual, expected);
+        assert!(actual[..3].iter().all(|sample| *sample == 0.0));
+        assert!(actual[3..10].iter().all(|sample| *sample != 0.0));
+        assert!(actual[10..].iter().all(|sample| *sample == 0.0));
+    }
+
+    #[test]
+    fn note_off_matches_channel_and_zero_velocity_releases_note() {
+        let plugin = SynthPlugin::default();
+        let mut kernel = plugin.create_kernel(KernelInit {
+            sample_rate: 48_000.0,
+            max_block_size: 8,
+        });
+        let on = Event::NoteOn {
+            sample_offset: 0,
+            channel: 2,
+            key: 60,
+            velocity: 1.0,
+            note_id: -1,
+        };
+        render(&mut kernel, plugin.params(), &[on], 1);
+        let other_channel = Event::NoteOff {
+            sample_offset: 0,
+            channel: 1,
+            key: 60,
+            velocity: 0.0,
+            note_id: -1,
+        };
+        render(&mut kernel, plugin.params(), &[other_channel], 1);
+        assert!(kernel.active_note.is_some());
+        let zero_velocity = Event::NoteOn {
+            sample_offset: 0,
+            channel: 2,
+            key: 60,
+            velocity: 0.0,
+            note_id: -1,
+        };
+        let output = render(&mut kernel, plugin.params(), &[zero_velocity], 4);
+        assert!(kernel.active_note.is_none());
+        assert_eq!(output, [0.0; 4]);
+    }
+
+    #[test]
+    fn prepare_updates_oscillator_sample_rate() {
+        let plugin = SynthPlugin::default();
+        let mut kernel = plugin.create_kernel(KernelInit {
+            sample_rate: 48_000.0,
+            max_block_size: 8,
+        });
+        kernel.prepare(PrepareContext {
+            sample_rate: 96_000.0,
+            max_block_size: 8,
+        });
+        let on = Event::NoteOn {
+            sample_offset: 0,
+            channel: 0,
+            key: 69,
+            velocity: 1.0,
+            note_id: 1,
+        };
+        render(&mut kernel, plugin.params(), &[on], 1);
+        assert!((kernel.phase - 440.0 / 96_000.0).abs() < 1.0e-7);
+    }
+
+    #[test]
+    fn zero_frame_batches_apply_notes_without_advancing_audio() {
+        let plugin = SynthPlugin::default();
+        let mut kernel = plugin.create_kernel(KernelInit {
+            sample_rate: 48_000.0,
+            max_block_size: 8,
+        });
+        let on = Event::NoteOn {
+            sample_offset: 0,
+            channel: 0,
+            key: 69,
+            velocity: 1.0,
+            note_id: 1,
+        };
+        assert!(render(&mut kernel, plugin.params(), &[on], 0).is_empty());
+        assert!(kernel.active_note.is_some());
+        assert_eq!(kernel.phase, 0.0);
+        let output = render(&mut kernel, plugin.params(), &[], 4);
+        assert!(output.iter().all(|sample| *sample != 0.0));
+        let phase = kernel.phase;
+        let off = Event::NoteOff {
+            sample_offset: 0,
+            channel: 0,
+            key: 69,
+            velocity: 0.0,
+            note_id: 1,
+        };
+        render(&mut kernel, plugin.params(), &[off], 0);
+        assert!(kernel.active_note.is_none());
+        assert_eq!(kernel.phase, phase);
+        assert_eq!(render(&mut kernel, plugin.params(), &[], 4), [0.0; 4]);
+    }
 
     #[test]
     fn exposes_program_metadata_and_program_change_param() {
@@ -505,6 +755,7 @@ mod tests {
         assert_eq!(
             kernel.active_note,
             Some(ActiveNote {
+                channel: 0,
                 key: 69,
                 note_id: 17,
             })
@@ -576,6 +827,7 @@ mod tests {
         assert_eq!(
             kernel.active_note,
             Some(ActiveNote {
+                channel: 0,
                 key: 60,
                 note_id: 5,
             })

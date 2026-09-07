@@ -1,6 +1,59 @@
 use super::*;
 
 #[test]
+fn processor_accepts_parameter_flush_while_processing_is_stopped() {
+    let wrapper = ComWrapper::new(
+        crate::bindings_impl::VestyProcessor::<TestPlugin>::with_telemetry_registry(
+            std::sync::Arc::new(crate::bindings_impl::Vst3TelemetryRegistry::default()),
+        ),
+    );
+    let processor = wrapper.to_com_ptr::<IAudioProcessor>().unwrap();
+    let component = wrapper.to_com_ptr::<IComponent>().unwrap();
+    let queue = ComWrapper::new(FakeParamValueQueue::new(
+        test_param_id("gain"),
+        vec![(0, 0.75)],
+    ));
+    let changes = ComWrapper::new(FakeParameterChanges {
+        queues: vec![queue.to_com_ptr::<IParamValueQueue>().unwrap()],
+    });
+    let changes_ptr = changes.to_com_ptr::<IParameterChanges>().unwrap();
+    let mut data = ProcessData {
+        processMode: ProcessModes_::kRealtime as int32,
+        symbolicSampleSize: SymbolicSampleSizes_::kSample32 as int32,
+        numSamples: 0,
+        numInputs: 0,
+        numOutputs: 0,
+        inputs: ptr::null_mut(),
+        outputs: ptr::null_mut(),
+        inputParameterChanges: changes_ptr.as_ptr(),
+        outputParameterChanges: ptr::null_mut(),
+        inputEvents: ptr::null_mut(),
+        outputEvents: ptr::null_mut(),
+        processContext: ptr::null_mut(),
+    };
+    // SAFETY: The locally owned COM objects remain live, and the zero-frame flush has no buffers.
+    unsafe {
+        assert_eq!(processor.setProcessing(0), kResultOk);
+        reset_rt_allocation_count();
+        assert_eq!(processor.process(&mut data), kResultOk);
+        assert_eq!(rt_allocation_count(), 0);
+        let stream = ComWrapper::new(MemoryStream::default());
+        let stream_ptr = stream.to_com_ptr::<IBStream>().unwrap();
+        assert_eq!(component.getState(stream_ptr.as_ptr()), kResultOk);
+        let bytes = stream.bytes();
+        let payload = bytes.strip_prefix(b"VESTY_STATE_V1\n").unwrap();
+        let state: serde_json::Value = serde_json::from_slice(payload).unwrap();
+        let gain = state["params"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|param| param["id"] == "gain")
+            .unwrap();
+        assert_eq!(gain["normalized"], 0.75);
+    }
+}
+
+#[test]
 fn processor_translates_automation_midi_and_transport() {
     // SAFETY: Test code is exercising fake VST3/COM objects and raw callback entrypoints with fixtures constructed in this module.
     unsafe {
@@ -31,7 +84,19 @@ fn processor_translates_automation_midi_and_transport() {
         assert_eq!(processor.setupProcessing(&mut setup), kResultOk);
 
         let gain_id = test_param_id("gain");
-        let queue = ComWrapper::new(FakeParamValueQueue::new(gain_id, vec![(2, 0.2), (6, 0.8)]));
+        let queue = ComWrapper::new(FakeParamValueQueue::new(
+            gain_id,
+            vec![
+                (0, f64::NAN),
+                (2, 0.2),
+                (4, f64::INFINITY),
+                (6, 0.8),
+                (7, f64::NEG_INFINITY),
+                (7, f64::NAN),
+                (-1, 0.3),
+                (8, 0.4),
+            ],
+        ));
         let changes = ComWrapper::new(FakeParameterChanges {
             queues: vec![queue.to_com_ptr::<IParamValueQueue>().unwrap()],
         });
@@ -189,7 +254,7 @@ fn processor_translates_automation_midi_and_transport() {
                 },
             },
         };
-        let events = ComWrapper::new(FakeEventList::new(vec![
+        let mut host_events = vec![
             note_on,
             note_off,
             poly_pressure,
@@ -200,7 +265,45 @@ fn processor_translates_automation_midi_and_transport() {
             mod_wheel,
             pitch_bend,
             channel_pressure,
-        ]));
+        ];
+        for offset in [-1, 8, i32::MAX] {
+            host_events.push(Event {
+                sampleOffset: offset,
+                ..note_on
+            });
+        }
+        for bus in [-1, 1] {
+            host_events.push(Event {
+                busIndex: bus,
+                ..note_on
+            });
+        }
+        for channel in [-1, 16] {
+            let mut invalid = note_on;
+            invalid.__field0.noteOn.channel = channel;
+            host_events.push(invalid);
+            let mut invalid = mod_wheel;
+            invalid.__field0.midiCCOut.channel = channel as i8;
+            host_events.push(invalid);
+        }
+        for key in [-1, 128] {
+            let mut invalid = note_off;
+            invalid.__field0.noteOff.pitch = key;
+            host_events.push(invalid);
+        }
+        for value in [f32::NAN, f32::INFINITY] {
+            let mut invalid = note_on;
+            invalid.__field0.noteOn.velocity = value;
+            host_events.push(invalid);
+            let mut invalid = poly_pressure;
+            invalid.__field0.polyPressure.pressure = value;
+            host_events.push(invalid);
+        }
+        // A malformed release velocity must still release the note, with a finite fallback.
+        let mut release = note_off;
+        release.__field0.noteOff.velocity = f32::NAN;
+        host_events.push(release);
+        let events = ComWrapper::new(FakeEventList::new(host_events));
         let events_ptr = events.to_com_ptr::<IEventList>().unwrap();
 
         let input_l = [0.0_f32; 8];
@@ -338,6 +441,13 @@ fn processor_translates_automation_midi_and_transport() {
                     velocity: 0.1,
                     note_id: 42,
                 },
+                CoreEvent::NoteOff {
+                    sample_offset: 7,
+                    channel: 1,
+                    key: 64,
+                    velocity: 0.0,
+                    note_id: 42,
+                },
             ]
         );
         let param_value = captured.param_value.expect("captured gain value");
@@ -354,6 +464,13 @@ fn processor_translates_automation_midi_and_transport() {
             }
         );
         assert_eq!(captured.process_mode, ProcessMode::Offline);
+
+        // Invalid trailing points must not replace the last valid value retained for the next block.
+        data.inputParameterChanges = ptr::null_mut();
+        data.inputEvents = ptr::null_mut();
+        assert_eq!(processor.process(&mut data), kResultOk);
+        let retained = CAPTURED_PROCESS.lock().unwrap().param_value.unwrap();
+        assert!((retained - 0.8).abs() < 0.000_001);
     }
 }
 

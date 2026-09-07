@@ -106,9 +106,19 @@ pub enum FixedListError {
     Full,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct FixedEventList<T, const N: usize> {
     items: Vec<T>,
+}
+
+impl<T: Clone, const N: usize> Clone for FixedEventList<T, N> {
+    fn clone(&self) -> Self {
+        // Vec::clone only reserves its current length. Retain the fixed capacity so subsequent
+        // pushes up to N cannot allocate after a cloned list enters the audio thread.
+        let mut cloned = Self::new();
+        cloned.items.extend_from_slice(&self.items);
+        cloned
+    }
 }
 
 impl<T, const N: usize> FixedEventList<T, N> {
@@ -216,6 +226,25 @@ mod tests {
         let mut list = FixedEventList::<u32, 1>::new();
         assert_eq!(list.push(1), Ok(()));
         assert_eq!(list.push(2), Err(FixedListError::Full));
+    }
+
+    #[test]
+    fn cloned_fixed_list_retains_preallocated_capacity() {
+        for len in [0, 1, 4] {
+            let mut original = FixedEventList::<u32, 4>::new();
+            for value in 0..len {
+                original.push(value).unwrap();
+            }
+            let mut cloned = original.clone();
+            assert_eq!(cloned.as_slice(), original.as_slice());
+            assert!(cloned.items.capacity() >= 4);
+            let allocation = cloned.items.as_ptr();
+            cloned.clear();
+            for value in 0..4 {
+                cloned.push(value).unwrap();
+            }
+            assert_eq!(cloned.items.as_ptr(), allocation);
+        }
     }
 
     #[test]

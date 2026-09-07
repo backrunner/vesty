@@ -3,5 +3,5 @@ allowBuilds:
   sharp: true
   workerd: true
 minimumReleaseAgeExclude:
-  - svedocs-cli@0.1.0-beta.8
-  - svedocs@0.1.0-beta.8
+  - svedocs-cli@0.1.0-beta.8 || 0.2.1
+  - svedocs@0.1.0-beta.8 || 0.2.1

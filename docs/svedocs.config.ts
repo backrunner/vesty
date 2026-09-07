@@ -2,6 +2,7 @@ import { defineConfig } from 'svedocs/config';
 
 export default defineConfig({
   site: {
+    url: process.env.VESTY_DOCS_URL || undefined,
     name: 'Vesty',
     title: 'Vesty documentation',
     description: 'Build VST3 effects and instruments in Rust with explicit realtime boundaries and system WebView editors.'
@@ -12,25 +13,26 @@ export default defineConfig({
     pages: 'content/pages'
   },
   theme: {
-    defaultMode: 'dark',
+    defaultMode: 'system',
+    readingStyle: 'plain',
     palette: {
-      accent: '#e47a5f',
-      neutral: 'stone'
+      accent: '#a3f77b',
+      neutral: 'slate'
     },
     fonts: {
-      sans: 'ui-rounded, "SF Pro Rounded", "Avenir Next", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
-      display: 'ui-rounded, "SF Pro Rounded", "Avenir Next", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
+      sans: '"Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
+      display: '"Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif',
       mono: 'ui-monospace, "SFMono-Regular", "Cascadia Code", Menlo, Consolas, monospace'
     },
-    radius: '4px',
+    radius: '6px',
     codeTheme: {
       light: 'github-light',
-      dark: 'vesper'
+      dark: 'github-dark'
     },
     brand: {
       label: 'VESTY',
       href: '/',
-      logo: '/favicon.svg'
+      logo: '/brand/vesty-mark.svg'
     },
     nav: [
       { label: 'Docs', labelKey: 'nav.docs', href: '/docs' },
@@ -38,9 +40,7 @@ export default defineConfig({
       { label: 'Guides', labelKey: 'nav.guides', href: '/docs/guides' },
       { label: 'Reference', labelKey: 'nav.reference', href: '/docs/reference' }
     ],
-    social: [
-      { label: 'GitHub', href: 'https://github.com/backrunner/vesty', external: true }
-    ],
+    social: [],
     footer: {
       text: 'Rust in the audio thread. Web tools in the editor.',
       links: [
@@ -67,6 +67,31 @@ export default defineConfig({
     ],
     messages: {
       en: {
+        'landing.terminalLabel': 'Plugin scaffold command preview',
+        'landing.preview': 'PREVIEW',
+        'landing.templateLabel': 'Choose a starter',
+        'landing.terminalComment': 'Start with a kernel. Add your interface.',
+        'landing.fileTree': 'Selected files in the generated project',
+        'landing.ready': 'ready when you are',
+        'landing.copy': 'copy command',
+        'landing.copied': 'command copied',
+        'landing.copyFailed': 'Select the command to copy manually.',
+        'landing.boundaryTag': '→ realtime boundary',
+        'landing.headline': 'Native sound.',
+        'landing.headlineAccent': 'Your interface.',
+        'landing.heroNote': 'From the first sample to your own plugin.',
+        'landing.capabilities': 'Framework capabilities',
+        'landing.effects': 'Audio effects',
+        'landing.instruments': 'MIDI instruments',
+        'landing.automation': 'Sample-accurate events',
+        'landing.audioLane': 'AUDIO THREAD / BORROWED BUFFERS',
+        'landing.controlLane': 'CONTROL & EDITOR / OUTSIDE PROCESS()',
+        'landing.controller': 'Controller',
+        'landing.boundaryNote': 'Host-mediated parameter edits; bounded queues carry meters and diagnostics out of the audio thread.',
+        'landing.cardMidi': 'Make it respond to MIDI',
+        'landing.cardMidiDescription': 'Handle notes, automation, dense event batches, and zero-frame contexts at the right sample.',
+        'landing.alphaNote': 'Vesty is in alpha. Local checks are available; releases still need real DAW, WebView, validator, and signing evidence.',
+        'landing.releaseEvidence': 'Track release readiness',
         'nav.docs': 'Docs',
         'nav.concepts': 'Concepts',
         'nav.guides': 'Guides',
@@ -74,7 +99,7 @@ export default defineConfig({
         'footer.text': 'Rust on the audio thread. Web tools in the editor.',
         'home.primaryAction': 'Start building',
         'home.secondaryAction': 'Read the architecture',
-        'landing.eyebrow': 'Rust-first framework for VST3 effects and instruments',
+        'landing.eyebrow': 'The Rust plugin framework',
         'landing.description': 'Author VST3 effects and instruments in Rust, keep DSP inside an explicit realtime boundary, and build the editor with a directly embedded system WebView.',
         'landing.status': 'ALPHA / VST3 FIRST',
         'landing.docs': 'Open documentation',
@@ -114,6 +139,31 @@ export default defineConfig({
         'landing.contractAction': 'Review realtime rules'
       },
       zh: {
+        'landing.terminalLabel': '插件脚手架命令预览',
+        'landing.preview': '预览',
+        'landing.templateLabel': '选择起始模板',
+        'landing.terminalComment': '从内核开始，接上你的界面。',
+        'landing.fileTree': '生成项目的部分文件',
+        'landing.ready': '等待你的第一条命令',
+        'landing.copy': '复制命令',
+        'landing.copied': '命令已复制',
+        'landing.copyFailed': '请选中命令手动复制。',
+        'landing.boundaryTag': '→ 实时边界',
+        'landing.headline': '声音，原生驱动。',
+        'landing.headlineAccent': '界面，由你定义。',
+        'landing.heroNote': '从第一个采样，到你自己的插件。',
+        'landing.capabilities': '框架能力',
+        'landing.effects': '音频效果器',
+        'landing.instruments': 'MIDI 乐器',
+        'landing.automation': '采样级精确事件',
+        'landing.audioLane': '音频线程 / 借用缓冲区',
+        'landing.controlLane': '控制与编辑器 / PROCESS() 之外',
+        'landing.controller': '控制器',
+        'landing.boundaryNote': '参数编辑由宿主协调；有界队列将电平与诊断数据传出音频线程。',
+        'landing.cardMidi': '让乐器响应 MIDI',
+        'landing.cardMidiDescription': '在正确的采样位置处理音符、自动化、密集事件分批与零帧上下文。',
+        'landing.alphaNote': 'Vesty 处于 alpha 阶段。已有本地检查工具；发布仍需真实 DAW、WebView、validator 和签名验证证据。',
+        'landing.releaseEvidence': '查看发布就绪要求',
         'nav.primary': '主导航',
         'nav.docs': '文档',
         'nav.concepts': '核心概念',
@@ -167,7 +217,7 @@ export default defineConfig({
         'home.primaryAction': '开始构建',
         'home.secondaryAction': '阅读架构',
         'home.features': '文档入口',
-        'landing.eyebrow': '用 Rust 开发 VST3 效果器与乐器',
+        'landing.eyebrow': 'Rust 音频插件框架',
         'landing.description': '使用 Rust 编写 VST3 效果器与乐器，在明确的实时边界内运行 DSP，并通过直接嵌入的系统 WebView 构建编辑器。',
         'landing.status': 'ALPHA / VST3 优先',
         'landing.docs': '打开文档',

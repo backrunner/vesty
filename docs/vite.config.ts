@@ -8,9 +8,7 @@ export default defineConfig({
   plugins: [
     svedocs({
       config: svedocsConfig,
-      // Register custom theme components here, then remove the default
-      // styles import in src/routes/+layout.svelte if you want full control.
-      // theme: { components: { Navbar: '$lib/theme/Navbar.svelte' } }
+      theme: { components: { Brand: '$lib/Brand.svelte' } }
     }),
     tailwindcss(),
     sveltekit()

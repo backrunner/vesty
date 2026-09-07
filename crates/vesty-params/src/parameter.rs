@@ -102,7 +102,11 @@ impl FloatParam {
         normalized_to_plain(&self.spec, self.normalized())
     }
 
+    /// Ignores non-finite updates and clamps finite values to the normalized range.
     pub fn set_normalized(&self, normalized: f64) {
+        if !normalized.is_finite() {
+            return;
+        }
         self.normalized_bits.store(
             (normalized.clamp(0.0, 1.0) as f32).to_bits(),
             Ordering::Relaxed,

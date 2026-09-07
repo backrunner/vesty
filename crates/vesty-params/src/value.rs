@@ -80,6 +80,9 @@ pub fn parse_normalized_value(spec: &ParamSpec, text: &str) -> Option<f64> {
         .unwrap_or(text)
         .trim();
     let plain = text.parse::<f64>().ok()?;
+    if !plain.is_finite() {
+        return None;
+    }
     Some(plain_to_normalized(spec, plain))
 }
 

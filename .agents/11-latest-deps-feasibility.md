@@ -1,5 +1,17 @@
 # 11. 最新依赖基线与可行性边界
 
+## 2026-09-07 CI 基线刷新
+
+GitHub Actions 的 `dependency baseline` 检查发现 13 个 Rust 和 4 个 npm 依赖的最新版本已超过旧基线。本轮同步更新 workspace 依赖、Cargo/npm 锁文件、CLI 基线与相关测试，保留严格的 registry latest 检查。
+
+- Rust 主要升级：`wry 0.56.1`、`rtrb 0.4.0`、`syn 3.0.5`，以及 camino、serde、serde_json、clap、plist、proc-macro2、quote、schemars、toml、thiserror 的补丁版本。
+- 已核对 wry 0.56 变更日志：`protocol` feature 被移除，自定义协议 API 现在始终提供。因此只移除该 feature 名称，保留 `os-webview` 和原有协议处理逻辑。未引入 Tauri。
+- npm 适配器测试依赖更新至 `react 19.2.8`、`@types/react 19.2.18`、`vue 3.5.42`、`svelte 5.57.0`；TypeScript 保持 `7.0.2`。
+- 本地 `cargo test --workspace --all-features`：736 passed、1 ignored；全功能 Clippy、Rust 格式检查、SDK 类型检查与全部 JS 测试通过。
+- `vesty dependency-baseline --latest` 的 67 项检查全部通过。报告位于构建目录 `target/ci-dependency-refresh/latest.json`。
+
+这些结果确认本地编译、测试和依赖版本的一致性；平台实机 WebView/DAW 与发布签名证据仍按既有发布门禁收集。以下旧日期记录保留为历史核查过程。
+
 核查日期: 2026-07-16
 
 核查方式:

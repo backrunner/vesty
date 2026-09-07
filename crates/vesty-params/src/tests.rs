@@ -48,6 +48,35 @@ fn converts_float_values() {
 }
 
 #[test]
+fn float_param_ignores_non_finite_updates() {
+    let param = FloatParam::new("gain", "Gain", 0.0, 1.0, 0.5);
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        param.set_normalized(value);
+        assert_eq!(param.normalized(), 0.5);
+    }
+    param.set_normalized(2.0);
+    assert_eq!(param.normalized(), 1.0);
+    param.set_normalized(-1.0);
+    assert_eq!(param.normalized(), 0.0);
+}
+
+#[test]
+fn parsing_rejects_non_finite_numbers() {
+    let specs = [
+        ParamSpec::float("gain", "Gain", -60.0, 12.0, 0.0).with_unit("dB"),
+        ParamSpec::bool("bypass", "Bypass", false),
+        ParamSpec::choice("mode", "Mode", ["Clean", "Drive"], 0),
+    ];
+    for spec in &specs {
+        for text in ["NaN", "inf", "-inf", "Infinity", "1e999"] {
+            assert_eq!(parse_normalized_value(spec, text), None, "{text}");
+        }
+    }
+    assert_eq!(parse_normalized_value(&specs[0], "NaN dB"), None);
+    assert_eq!(parse_normalized_value(&specs[0], "12 dB"), Some(1.0));
+}
+
+#[test]
 fn derives_stable_vst3_param_ids_from_string_ids() {
     assert_eq!(
         VST3_PARAM_ID_ALGORITHM,

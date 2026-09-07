@@ -390,12 +390,16 @@ jobs:
           path: target/smoke-host
 
   scaffold:
-    name: scaffold smoke (${{ matrix.ui }})
+    name: scaffold smoke (${{ matrix.kind }}, ${{ matrix.ui }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         ui: [none, vanilla, react, vue, svelte]
+        kind: [effect]
+        include:
+          - { kind: instrument, ui: none }
+          - { kind: instrument, ui: react }
 
     steps:
       - uses: actions/checkout@v6
@@ -425,19 +429,21 @@ jobs:
       - name: Generate local path scaffold
         env:
           UI_TEMPLATE: ${{ matrix.ui }}
+          PLUGIN_KIND: ${{ matrix.kind }}
         run: |
           rm -rf target/ci-scaffold
           mkdir -p target/ci-scaffold
           cd target/ci-scaffold
           cargo run -p vesty-cli -- new "demo-${UI_TEMPLATE}" \
             --ui "${UI_TEMPLATE}" \
+            --kind "${PLUGIN_KIND}" \
             --vesty-path "$GITHUB_WORKSPACE/crates/vesty" \
             --plugin-ui-path "$GITHUB_WORKSPACE/packages/plugin-ui"
 
-      - name: Check generated Rust plugin
+      - name: Test generated Rust plugin
         env:
           UI_TEMPLATE: ${{ matrix.ui }}
-        run: cargo check --manifest-path "target/ci-scaffold/demo-${UI_TEMPLATE}/Cargo.toml"
+        run: cargo test --manifest-path "target/ci-scaffold/demo-${UI_TEMPLATE}/Cargo.toml"
 
       - name: Build generated Web UI
         if: matrix.ui != 'none'

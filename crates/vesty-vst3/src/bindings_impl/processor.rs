@@ -4,8 +4,9 @@ pub(crate) struct VestyProcessor<P: Plugin + Default> {
     plugin: P,
     kernel: UnsafeCell<Option<P::Kernel>>,
     events: UnsafeCell<FixedEventList<VestyEvent, MAX_BLOCK_EVENTS>>,
+    event_order: UnsafeCell<Vec<EventOrder>>,
     final_param_values: UnsafeCell<Vec<Option<f64>>>,
-    meter_producer: UnsafeCell<RtMeterProducer>,
+    meter_producer: UnsafeCell<OffsetMeterSink>,
     log_producer: UnsafeCell<RtLogProducer>,
     telemetry_id: u64,
     telemetry_registry: Arc<Vst3TelemetryRegistry>,
@@ -22,6 +23,7 @@ pub(crate) struct VestyProcessor<P: Plugin + Default> {
     io_mode: AtomicI32,
     processing_active: AtomicBool,
     sample64_scratch: UnsafeCell<Sample64Scratch>,
+    native64_output_scratch: UnsafeCell<[Vec<f64>; MAX_AUDIO_OUTPUT_CHANNELS]>,
     connection: SharedConnectionPoint,
     fault: Arc<FaultState>,
 }
@@ -396,6 +398,31 @@ impl<T> ProcessOutputLayout<T> {
             channel_count: 0,
         }
     }
+
+    fn overlaps(
+        &self,
+        inputs: Option<&[*mut T]>,
+        sidechain: Option<&[*mut T]>,
+        frames: usize,
+    ) -> bool {
+        if frames == 0 {
+            return false;
+        }
+        let bytes = frames.saturating_mul(size_of::<T>());
+        let outputs = &self.channels[..self.channel_count];
+        outputs.iter().enumerate().any(|(index, output)| {
+            let start = *output as usize;
+            inputs
+                .unwrap_or_default()
+                .iter()
+                .chain(sidechain.unwrap_or_default())
+                .chain(&outputs[..index])
+                .any(|other| {
+                    let other = *other as usize;
+                    start < other.saturating_add(bytes) && other < start.saturating_add(bytes)
+                })
+        })
+    }
 }
 
 pub(super) fn uninit_array<T, const N: usize>() -> [MaybeUninit<T>; N] {
@@ -704,8 +731,8 @@ unsafe fn output_views32<'a>(
     frames: usize,
     storage: &'a mut [MaybeUninit<&'a mut [f32]>; MAX_AUDIO_OUTPUT_CHANNELS],
 ) -> &'a mut [&'a mut [f32]] {
-    // SAFETY: `layout` contains distinct, non-null output channel pointers validated from the host
-    // bus list. Each channel is converted exactly once into a mutable slice for the process block.
+    // SAFETY: The caller checked `layout.overlaps` to exclude overlap between output channels
+    // and with either input bus. Non-null host channels are each converted once to a mutable slice.
     unsafe {
         for (index, slot) in storage.iter_mut().enumerate().take(layout.channel_count) {
             slot.write(slice::from_raw_parts_mut(layout.channels[index], frames));
@@ -722,8 +749,8 @@ unsafe fn output_views64<'a>(
     frames: usize,
     storage: &'a mut [MaybeUninit<&'a mut [f64]>; MAX_AUDIO_OUTPUT_CHANNELS],
 ) -> &'a mut [&'a mut [f64]] {
-    // SAFETY: `layout` contains distinct, non-null output channel pointers validated from the host
-    // bus list. Each channel is converted exactly once into a mutable slice for the process block.
+    // SAFETY: The caller checked `layout.overlaps` to exclude overlap between output channels
+    // and with either input bus. Non-null host channels are each converted once to a mutable slice.
     unsafe {
         for (index, slot) in storage.iter_mut().enumerate().take(layout.channel_count) {
             slot.write(slice::from_raw_parts_mut(layout.channels[index], frames));
@@ -758,12 +785,12 @@ unsafe fn scratch_input_views_from_f64<'a, const N: usize>(
     }
 }
 
-unsafe fn scratch_output_views<'a>(
-    scratch: &'a mut [Vec<f32>; MAX_AUDIO_OUTPUT_CHANNELS],
+unsafe fn scratch_output_views<'a, T>(
+    scratch: &'a mut [Vec<T>; MAX_AUDIO_OUTPUT_CHANNELS],
     frames: usize,
     channel_count: usize,
-    storage: &'a mut [MaybeUninit<&'a mut [f32]>; MAX_AUDIO_OUTPUT_CHANNELS],
-) -> &'a mut [&'a mut [f32]] {
+    storage: &'a mut [MaybeUninit<&'a mut [T]>; MAX_AUDIO_OUTPUT_CHANNELS],
+) -> &'a mut [&'a mut [T]] {
     // SAFETY: The first `channel_count` scratch channels are unique Vecs prepared to `frames`
     // capacity before processing; raw indexing avoids holding overlapping borrows of the array.
     unsafe {
@@ -772,7 +799,35 @@ unsafe fn scratch_output_views<'a>(
             let channel = &mut *base.add(index);
             slot.write(&mut channel[..frames]);
         }
-        slice::from_raw_parts_mut(storage.as_mut_ptr() as *mut &'a mut [f32], channel_count)
+        slice::from_raw_parts_mut(storage.as_mut_ptr() as *mut &'a mut [T], channel_count)
+    }
+}
+
+unsafe fn copy_native_outputs_to_scratch<T: Copy>(
+    layout: &ProcessOutputLayout<T>,
+    scratch: &mut [Vec<T>; MAX_AUDIO_OUTPUT_CHANNELS],
+    frames: usize,
+) {
+    // SAFETY: Host channels are valid for `frames` samples, and scratch capacity is checked by
+    // the caller. Each copy uses a separate allocation before any kernel channel views exist.
+    unsafe {
+        for (channel, scratch) in layout.channels[..layout.channel_count].iter().zip(scratch) {
+            scratch[..frames].copy_from_slice(slice::from_raw_parts(*channel, frames));
+        }
+    }
+}
+
+unsafe fn copy_native_scratch_to_outputs<T: Copy>(
+    scratch: &[Vec<T>; MAX_AUDIO_OUTPUT_CHANNELS],
+    layout: &ProcessOutputLayout<T>,
+    frames: usize,
+) {
+    // SAFETY: Kernel input/output views have expired before copying back to host memory. Copies
+    // are sequential, so even overlapping host output channels never create aliased references.
+    unsafe {
+        for (channel, scratch) in layout.channels[..layout.channel_count].iter().zip(scratch) {
+            slice::from_raw_parts_mut(*channel, frames).copy_from_slice(&scratch[..frames]);
+        }
     }
 }
 
@@ -1017,8 +1072,12 @@ impl<P: Plugin + Default> VestyProcessor<P> {
             plugin,
             kernel: UnsafeCell::new(None),
             events: UnsafeCell::new(FixedEventList::new()),
+            event_order: UnsafeCell::new(vec![((0, 0), 0); MAX_BLOCK_EVENTS]),
             final_param_values: UnsafeCell::new(vec![None; param_count]),
-            meter_producer: UnsafeCell::new(meter_producer),
+            meter_producer: UnsafeCell::new(OffsetMeterSink {
+                producer: meter_producer,
+                offset: 0,
+            }),
             log_producer: UnsafeCell::new(log_producer),
             telemetry_id,
             telemetry_registry,
@@ -1037,6 +1096,7 @@ impl<P: Plugin + Default> VestyProcessor<P> {
             io_mode: AtomicI32::new(IoModes_::kSimple as IoMode),
             processing_active: AtomicBool::new(true),
             sample64_scratch: UnsafeCell::new(Sample64Scratch::default()),
+            native64_output_scratch: UnsafeCell::new(std::array::from_fn(|_| Vec::new())),
             connection: Mutex::new(None),
             fault,
         })
@@ -1096,11 +1156,10 @@ impl<P: Plugin + Default> VestyProcessor<P> {
         }
     }
 
-    unsafe fn collect_parameter_changes(
+    unsafe fn visit_parameter_changes(
         &self,
         process_data: &ProcessData,
-        events: &mut FixedEventList<VestyEvent, MAX_BLOCK_EVENTS>,
-        final_values: &mut [Option<f64>],
+        emit: &mut impl FnMut(VestyEvent),
     ) {
         // SAFETY: This block isolates raw host pointers/COM calls inside the VST3 adapter boundary; callers uphold the enclosing unsafe callback contract and nullable pointers are checked before use.
         unsafe {
@@ -1123,23 +1182,22 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                 let Some(param_index) = self.vst3_param_ids.index_for_host_id(host_param_id) else {
                     continue;
                 };
-                let Some(final_value) = final_values.get_mut(param_index) else {
-                    continue;
-                };
 
                 for point_index in 0..point_count {
                     let mut sample_offset = 0;
                     let mut value = 0.0;
                     if param_queue.getPoint(point_index, &mut sample_offset, &mut value)
                         != kResultTrue
+                        || !value.is_finite()
+                        || sample_offset < 0
+                        || sample_offset >= process_data.numSamples.max(1)
                     {
                         continue;
                     }
 
                     let normalized = value.clamp(0.0, 1.0);
-                    *final_value = Some(normalized);
-                    let _ = events.push(VestyEvent::Param {
-                        sample_offset: sample_offset.max(0) as u32,
+                    emit(VestyEvent::Param {
+                        sample_offset: sample_offset as u32,
                         handle: vesty_params::ParamHandle::from_index(param_index),
                         id_hash: host_param_id,
                         normalized,
@@ -1161,10 +1219,76 @@ impl<P: Plugin + Default> VestyProcessor<P> {
         }
     }
 
-    unsafe fn collect_input_events(
+    fn apply_batch_parameter_values(&self, events: &[VestyEvent]) {
+        for event in events {
+            if let VestyEvent::Param {
+                handle, normalized, ..
+            } = *event
+            {
+                let _ = self
+                    .plugin
+                    .params()
+                    .set_normalized_by_handle(handle, normalized);
+            }
+        }
+    }
+
+    unsafe fn process_event_batches(
+        &self,
+        source: &ProcessData,
+        mut process: impl FnMut(usize, usize, &[VestyEvent]) -> ProcessResult,
+    ) -> ProcessResult {
+        // SAFETY: The host event lists remain valid throughout process(). The batch workspace is
+        // exclusively used by the serialized audio callback; kernel calls borrow only its slice.
+        unsafe {
+            let events = &mut *self.events.get();
+            let order = &mut *self.event_order.get();
+            let mut after = None;
+            let mut start = 0_u32;
+            let mut result = ProcessResult::Silence;
+            loop {
+                let mut batch = EventBatch::new(events, order, after);
+                let mut emit = |event| batch.push(event);
+                self.visit_parameter_changes(source, &mut emit);
+                self.visit_input_events(source, &mut emit);
+                let Some((last, next)) = batch.finish() else {
+                    break;
+                };
+                let end = next.unwrap_or(source.numSamples as u32);
+                let boundary = events
+                    .as_slice()
+                    .partition_point(|event| event.sample_offset() < end);
+                let (audio_events, boundary_events) = events.as_mut_slice().split_at_mut(boundary);
+                rebase_events(audio_events, start);
+                if end > start {
+                    if process(start as usize, end as usize, audio_events)
+                        == ProcessResult::Continue
+                    {
+                        result = ProcessResult::Continue;
+                    }
+                    self.apply_batch_parameter_values(audio_events);
+                }
+                if !boundary_events.is_empty() {
+                    // More events remain at this exact sample. Deliver the prefix without
+                    // advancing audio; the remaining events arrive before that sample is rendered.
+                    rebase_events(boundary_events, end);
+                    process(end as usize, end as usize, boundary_events);
+                    self.apply_batch_parameter_values(boundary_events);
+                }
+                after = Some(last);
+                start = end;
+                if next.is_none() || self.fault.is_faulted() {
+                    break;
+                }
+            }
+            result
+        }
+    }
+
+    unsafe fn visit_input_events(
         &self,
         process_data: &ProcessData,
-        events: &mut FixedEventList<VestyEvent, MAX_BLOCK_EVENTS>,
+        emit: &mut impl FnMut(VestyEvent),
     ) {
         // SAFETY: This block isolates raw host pointers/COM calls inside the VST3 adapter boundary; callers uphold the enclosing unsafe callback contract and nullable pointers are checked before use.
         unsafe {
@@ -1180,34 +1304,59 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                 }
 
                 let event = event.assume_init();
-                let sample_offset = event.sampleOffset.max(0) as u32;
+                if event.busIndex != 0
+                    || event.sampleOffset < 0
+                    || event.sampleOffset >= process_data.numSamples
+                {
+                    continue;
+                }
+                let sample_offset = event.sampleOffset as u32;
                 match event.r#type as Event_::EventTypes {
                     Event_::EventTypes_::kNoteOnEvent => {
                         let note = event.__field0.noteOn;
-                        let _ = events.push(VestyEvent::NoteOn {
+                        if !(0..=15).contains(&note.channel)
+                            || !(0..=127).contains(&note.pitch)
+                            || !note.velocity.is_finite()
+                        {
+                            continue;
+                        }
+                        emit(VestyEvent::NoteOn {
                             sample_offset,
-                            channel: clamp_midi_channel_i16(note.channel),
-                            key: clamp_midi_key(note.pitch),
+                            channel: note.channel as u16,
+                            key: note.pitch as u8,
                             velocity: note.velocity.clamp(0.0, 1.0),
                             note_id: note.noteId,
                         });
                     }
                     Event_::EventTypes_::kNoteOffEvent => {
                         let note = event.__field0.noteOff;
-                        let _ = events.push(VestyEvent::NoteOff {
+                        if !(0..=15).contains(&note.channel) || !(0..=127).contains(&note.pitch) {
+                            continue;
+                        }
+                        emit(VestyEvent::NoteOff {
                             sample_offset,
-                            channel: clamp_midi_channel_i16(note.channel),
-                            key: clamp_midi_key(note.pitch),
-                            velocity: note.velocity.clamp(0.0, 1.0),
+                            channel: note.channel as u16,
+                            key: note.pitch as u8,
+                            velocity: if note.velocity.is_finite() {
+                                note.velocity.clamp(0.0, 1.0)
+                            } else {
+                                0.0
+                            },
                             note_id: note.noteId,
                         });
                     }
                     Event_::EventTypes_::kPolyPressureEvent => {
                         let pressure = event.__field0.polyPressure;
-                        let _ = events.push(VestyEvent::PolyPressure {
+                        if !(0..=15).contains(&pressure.channel)
+                            || !(0..=127).contains(&pressure.pitch)
+                            || !pressure.pressure.is_finite()
+                        {
+                            continue;
+                        }
+                        emit(VestyEvent::PolyPressure {
                             sample_offset,
-                            channel: clamp_midi_channel_i16(pressure.channel),
-                            key: clamp_midi_key(pressure.pitch),
+                            channel: pressure.channel as u16,
+                            key: pressure.pitch as u8,
                             pressure: pressure.pressure.clamp(0.0, 1.0),
                             note_id: pressure.noteId,
                         });
@@ -1217,7 +1366,7 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                         if data.r#type == DataEvent_::DataTypes_::kMidiSysEx as uint32 {
                             let (payload, data_len, truncated) =
                                 copy_sysex_data(data.bytes, data.size);
-                            let _ = events.push(VestyEvent::SysEx {
+                            emit(VestyEvent::SysEx {
                                 sample_offset,
                                 data_len,
                                 data: payload,
@@ -1232,7 +1381,7 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                         } else {
                             0.0
                         };
-                        let _ = events.push(VestyEvent::NoteExpressionValue {
+                        emit(VestyEvent::NoteExpressionValue {
                             sample_offset,
                             type_id: expression.typeId,
                             note_id: expression.noteId,
@@ -1241,7 +1390,7 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                     }
                     Event_::EventTypes_::kNoteExpressionIntValueEvent => {
                         let expression = event.__field0.noteExpressionIntValue;
-                        let _ = events.push(VestyEvent::NoteExpressionInt {
+                        emit(VestyEvent::NoteExpressionInt {
                             sample_offset,
                             type_id: expression.typeId,
                             note_id: expression.noteId,
@@ -1252,7 +1401,7 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                         let expression = event.__field0.noteExpressionText;
                         let (text, text_len) =
                             copy_note_expression_text(expression.text, expression.textLen);
-                        let _ = events.push(VestyEvent::NoteExpressionText {
+                        emit(VestyEvent::NoteExpressionText {
                             sample_offset,
                             type_id: expression.typeId,
                             note_id: expression.noteId,
@@ -1262,26 +1411,29 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                     }
                     Event_::EventTypes_::kLegacyMIDICCOutEvent => {
                         let midi = event.__field0.midiCCOut;
-                        let channel = clamp_midi_channel_i8(midi.channel);
+                        if !(0..=15).contains(&midi.channel) {
+                            continue;
+                        }
+                        let channel = midi.channel as u16;
                         let value = clamp_midi7_i8(midi.value);
                         let value2 = clamp_midi7_i8(midi.value2);
                         match u32::from(midi.controlNumber) {
                             LEGACY_PITCH_BEND_CONTROL => {
-                                let _ = events.push(VestyEvent::PitchBend {
+                                emit(VestyEvent::PitchBend {
                                     sample_offset,
                                     channel,
                                     value: midi_pitch_bend_to_bipolar(value, value2),
                                 });
                             }
                             LEGACY_AFTERTOUCH_CONTROL => {
-                                let _ = events.push(VestyEvent::ChannelPressure {
+                                emit(VestyEvent::ChannelPressure {
                                     sample_offset,
                                     channel,
                                     pressure: midi7_to_unit(value),
                                 });
                             }
                             control => {
-                                let _ = events.push(VestyEvent::MidiCc {
+                                emit(VestyEvent::MidiCc {
                                     sample_offset,
                                     channel,
                                     controller: control as u16,
@@ -1318,17 +1470,80 @@ impl<P: Plugin + Default> VestyProcessor<P> {
         inputs: &'a [&'a [f32]],
         sidechain: &'a [&'a [f32]],
         outputs: &'a mut [&'a mut [f32]],
+        events: ProcessEvents<'a>,
+        transport: Transport,
+        process_mode: ProcessMode,
+    ) -> ProcessResult {
+        // SAFETY: All full-block channel views have already passed host layout and alias checks.
+        // Sub-block views are disjoint reborrows; each expires before processing the next range.
+        unsafe {
+            if let ProcessEvents::Cached(events) = events {
+                return self.invoke_kernel(
+                    AudioBuffers::new(inputs, outputs),
+                    SidechainBuffers::new(sidechain),
+                    events,
+                    transport,
+                    process_mode,
+                    0,
+                );
+            }
+            let ProcessEvents::Host(source) = events else {
+                unreachable!()
+            };
+            let result = self.process_event_batches(source, |start, end, events| {
+                let mut input_views = [&[][..]; MAX_MAIN_IO_CHANNELS];
+                for (view, input) in input_views.iter_mut().zip(inputs) {
+                    *view = &input[start..end];
+                }
+                let mut sidechain_views = [&[][..]; MAX_SIDECHAIN_CHANNELS];
+                for (view, input) in sidechain_views.iter_mut().zip(sidechain) {
+                    *view = &input[start..end];
+                }
+                let count = outputs.len();
+                let mut output_views: [&mut [f32]; MAX_AUDIO_OUTPUT_CHANNELS] =
+                    std::array::from_fn(|_| &mut [][..]);
+                for (view, output) in output_views.iter_mut().zip(outputs.iter_mut()) {
+                    *view = &mut output[start..end];
+                }
+                let transport = Transport {
+                    position_samples: transport
+                        .position_samples
+                        .and_then(|position| position.checked_add(start as i64)),
+                    ..transport
+                };
+                self.invoke_kernel(
+                    AudioBuffers::new(&input_views[..inputs.len()], &mut output_views[..count]),
+                    SidechainBuffers::new(&sidechain_views[..sidechain.len()]),
+                    events,
+                    transport,
+                    process_mode,
+                    start as u32,
+                )
+            });
+            if self.fault.is_faulted() {
+                for output in outputs {
+                    output.fill(0.0);
+                }
+                return ProcessResult::Silence;
+            }
+            result
+        }
+    }
+
+    unsafe fn invoke_kernel<'a>(
+        &'a self,
+        mut audio: AudioBuffers<'a>,
+        sidechain: SidechainBuffers<'a>,
         events: &'a [VestyEvent],
         transport: Transport,
         process_mode: ProcessMode,
+        block_offset: u32,
     ) -> ProcessResult {
         // SAFETY: This block isolates raw host pointers/COM calls inside the VST3 adapter boundary; callers uphold the enclosing unsafe callback contract and nullable pointers are checked before use.
         unsafe {
             let slot = &mut *self.kernel.get();
             let Some(kernel) = slot.as_mut() else {
-                for output in outputs.iter_mut() {
-                    output.fill(0.0);
-                }
+                audio.clear_outputs();
                 let log_producer = &mut *self.log_producer.get();
                 let _ = log_producer.try_push(RtLogEvent::HostWarning {
                     code: RT_LOG_CODE_PROCESS_WITHOUT_KERNEL,
@@ -1337,9 +1552,8 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                 return ProcessResult::Silence;
             };
 
-            let audio = AudioBuffers::new(inputs, outputs);
-            let sidechain = SidechainBuffers::new(sidechain);
             let meter_producer = &mut *self.meter_producer.get();
+            meter_producer.offset = block_offset;
             let mut context =
                 VestyProcessContext::new(audio, self.plugin.params(), events, transport)
                     .with_sidechain(sidechain)
@@ -1367,17 +1581,79 @@ impl<P: Plugin + Default> VestyProcessor<P> {
         inputs: &'a [&'a [f64]],
         sidechain: &'a [&'a [f64]],
         outputs: &'a mut [&'a mut [f64]],
+        events: ProcessEvents<'a>,
+        transport: Transport,
+        process_mode: ProcessMode,
+    ) -> ProcessResult {
+        // SAFETY: Full-block views are validated and each sub-block uses temporary reborrows.
+        unsafe {
+            if let ProcessEvents::Cached(events) = events {
+                return self.invoke_kernel_f64(
+                    AudioBuffers64::new(inputs, outputs),
+                    SidechainBuffers64::new(sidechain),
+                    events,
+                    transport,
+                    process_mode,
+                    0,
+                );
+            }
+            let ProcessEvents::Host(source) = events else {
+                unreachable!()
+            };
+            let result = self.process_event_batches(source, |start, end, events| {
+                let mut input_views = [&[][..]; MAX_MAIN_IO_CHANNELS];
+                for (view, input) in input_views.iter_mut().zip(inputs) {
+                    *view = &input[start..end];
+                }
+                let mut sidechain_views = [&[][..]; MAX_SIDECHAIN_CHANNELS];
+                for (view, input) in sidechain_views.iter_mut().zip(sidechain) {
+                    *view = &input[start..end];
+                }
+                let count = outputs.len();
+                let mut output_views: [&mut [f64]; MAX_AUDIO_OUTPUT_CHANNELS] =
+                    std::array::from_fn(|_| &mut [][..]);
+                for (view, output) in output_views.iter_mut().zip(outputs.iter_mut()) {
+                    *view = &mut output[start..end];
+                }
+                let transport = Transport {
+                    position_samples: transport
+                        .position_samples
+                        .and_then(|position| position.checked_add(start as i64)),
+                    ..transport
+                };
+                self.invoke_kernel_f64(
+                    AudioBuffers64::new(&input_views[..inputs.len()], &mut output_views[..count]),
+                    SidechainBuffers64::new(&sidechain_views[..sidechain.len()]),
+                    events,
+                    transport,
+                    process_mode,
+                    start as u32,
+                )
+            });
+            if self.fault.is_faulted() {
+                for output in outputs {
+                    output.fill(0.0);
+                }
+                return ProcessResult::Silence;
+            }
+            result
+        }
+    }
+
+    unsafe fn invoke_kernel_f64<'a>(
+        &'a self,
+        mut audio: AudioBuffers64<'a>,
+        sidechain: SidechainBuffers64<'a>,
         events: &'a [VestyEvent],
         transport: Transport,
         process_mode: ProcessMode,
+        block_offset: u32,
     ) -> ProcessResult {
         // SAFETY: This block isolates raw host pointers/COM calls inside the VST3 adapter boundary; callers uphold the enclosing unsafe callback contract and nullable pointers are checked before use.
         unsafe {
             let slot = &mut *self.kernel.get();
             let Some(kernel) = slot.as_mut() else {
-                for output in outputs.iter_mut() {
-                    output.fill(0.0);
-                }
+                audio.clear_outputs();
                 let log_producer = &mut *self.log_producer.get();
                 let _ = log_producer.try_push(RtLogEvent::HostWarning {
                     code: RT_LOG_CODE_PROCESS_WITHOUT_KERNEL,
@@ -1386,9 +1662,8 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                 return ProcessResult::Silence;
             };
 
-            let audio = AudioBuffers64::new(inputs, outputs);
-            let sidechain = SidechainBuffers64::new(sidechain);
             let meter_producer = &mut *self.meter_producer.get();
+            meter_producer.offset = block_offset;
             let mut context =
                 VestyProcessContext64::new(audio, self.plugin.params(), events, transport)
                     .with_sidechain(sidechain)
@@ -1414,7 +1689,7 @@ impl<P: Plugin + Default> VestyProcessor<P> {
     unsafe fn process_sample32(
         &self,
         process_data: &ProcessData,
-        events: &[VestyEvent],
+        events: ProcessEvents<'_>,
         transport: Transport,
         process_mode: ProcessMode,
     ) -> tresult {
@@ -1446,6 +1721,22 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                 None
             };
 
+            let use_scratch =
+                output_layout.overlaps(input_channels, sidechain_channels, num_samples);
+            let scratch = &mut *self.sample64_scratch.get();
+            if use_scratch {
+                if !scratch.has_capacity(num_samples) {
+                    silence_process_outputs32(
+                        &self.plugin,
+                        &self.output_arrangements,
+                        process_data,
+                        num_samples,
+                    );
+                    return kResultOk;
+                }
+                copy_native_outputs_to_scratch(&output_layout, &mut scratch.outputs, num_samples);
+            }
+
             let process_result = {
                 let mut input_storage: [MaybeUninit<&[f32]>; MAX_MAIN_IO_CHANNELS] = uninit_array();
                 let mut sidechain_storage: [MaybeUninit<&[f32]>; MAX_SIDECHAIN_CHANNELS] =
@@ -1455,9 +1746,21 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                 let inputs = input_views32(input_channels, num_samples, &mut input_storage);
                 let sidechain =
                     input_views32(sidechain_channels, num_samples, &mut sidechain_storage);
-                let outputs = output_views32(&output_layout, num_samples, &mut output_storage);
+                let outputs = if use_scratch {
+                    scratch_output_views(
+                        &mut scratch.outputs,
+                        num_samples,
+                        output_layout.channel_count,
+                        &mut output_storage,
+                    )
+                } else {
+                    output_views32(&output_layout, num_samples, &mut output_storage)
+                };
                 self.run_kernel(inputs, sidechain, outputs, events, transport, process_mode)
             };
+            if use_scratch {
+                copy_native_scratch_to_outputs(&scratch.outputs, &output_layout, num_samples);
+            }
             set_output_silence_flags(
                 process_data,
                 &output_layout,
@@ -1470,7 +1773,7 @@ impl<P: Plugin + Default> VestyProcessor<P> {
     unsafe fn process_sample64(
         &self,
         process_data: &ProcessData,
-        events: &[VestyEvent],
+        events: ProcessEvents<'_>,
         transport: Transport,
         process_mode: ProcessMode,
     ) -> tresult {
@@ -1487,7 +1790,7 @@ impl<P: Plugin + Default> VestyProcessor<P> {
     unsafe fn process_sample64_native(
         &self,
         process_data: &ProcessData,
-        events: &[VestyEvent],
+        events: ProcessEvents<'_>,
         transport: Transport,
         process_mode: ProcessMode,
     ) -> tresult {
@@ -1519,6 +1822,18 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                 None
             };
 
+            let use_scratch =
+                output_layout.overlaps(input_channels, sidechain_channels, num_samples);
+            let scratch = &mut *self.native64_output_scratch.get();
+            if use_scratch {
+                if scratch[0].len() < num_samples {
+                    clear_output_layout64(&output_layout, num_samples);
+                    set_output_silence_flags(process_data, &output_layout, true);
+                    return kResultOk;
+                }
+                copy_native_outputs_to_scratch(&output_layout, scratch, num_samples);
+            }
+
             let process_result = {
                 let mut input_storage: [MaybeUninit<&[f64]>; MAX_MAIN_IO_CHANNELS] = uninit_array();
                 let mut sidechain_storage: [MaybeUninit<&[f64]>; MAX_SIDECHAIN_CHANNELS] =
@@ -1528,9 +1843,21 @@ impl<P: Plugin + Default> VestyProcessor<P> {
                 let inputs = input_views64(input_channels, num_samples, &mut input_storage);
                 let sidechain =
                     input_views64(sidechain_channels, num_samples, &mut sidechain_storage);
-                let outputs = output_views64(&output_layout, num_samples, &mut output_storage);
+                let outputs = if use_scratch {
+                    scratch_output_views(
+                        scratch,
+                        num_samples,
+                        output_layout.channel_count,
+                        &mut output_storage,
+                    )
+                } else {
+                    output_views64(&output_layout, num_samples, &mut output_storage)
+                };
                 self.run_kernel_f64(inputs, sidechain, outputs, events, transport, process_mode)
             };
+            if use_scratch {
+                copy_native_scratch_to_outputs(scratch, &output_layout, num_samples);
+            }
             set_output_silence_flags(
                 process_data,
                 &output_layout,
@@ -1543,7 +1870,7 @@ impl<P: Plugin + Default> VestyProcessor<P> {
     unsafe fn process_sample64_via_f32_scratch(
         &self,
         process_data: &ProcessData,
-        events: &[VestyEvent],
+        events: ProcessEvents<'_>,
         transport: Transport,
         process_mode: ProcessMode,
     ) -> tresult {
@@ -2036,6 +2363,11 @@ impl<P: Plugin + Default> IAudioProcessorTrait for VestyProcessor<P> {
                 .store(sample_rate.to_bits(), Ordering::Relaxed);
             self.max_block_size.store(max_block_size, Ordering::Relaxed);
             (&mut *self.sample64_scratch.get()).prepare(max_block_size);
+            if P::Kernel::SUPPORTS_F64 {
+                for channel in &mut *self.native64_output_scratch.get() {
+                    channel.resize(max_block_size, 0.0);
+                }
+            }
             if let Some(kernel) = (&mut *self.kernel.get()).as_mut() {
                 kernel.prepare(PrepareContext {
                     sample_rate,
@@ -2106,7 +2438,7 @@ impl<P: Plugin + Default> IAudioProcessorTrait for VestyProcessor<P> {
                 }
                 return kResultOk;
             }
-            if !self.processing_active.load(Ordering::Acquire) {
+            if !self.processing_active.load(Ordering::Acquire) && process_data.numSamples != 0 {
                 let frames = process_data.numSamples.max(0) as usize;
                 match symbolic_sample_size {
                     SymbolicSampleSizes_::kSample32 => {
@@ -2129,22 +2461,51 @@ impl<P: Plugin + Default> IAudioProcessorTrait for VestyProcessor<P> {
                 }
                 return kResultOk;
             }
-            let events = &mut *self.events.get();
-            events.clear();
             let final_param_values = &mut *self.final_param_values.get();
             final_param_values.fill(None);
-            self.collect_parameter_changes(process_data, events, final_param_values);
-            self.collect_input_events(process_data, events);
-            sort_events_by_sample_offset(events);
+            let overflow = {
+                let events = &mut *self.events.get();
+                events.clear();
+                let mut overflow = false;
+                self.visit_parameter_changes(process_data, &mut |event| {
+                    if let VestyEvent::Param {
+                        handle, normalized, ..
+                    } = event
+                    {
+                        final_param_values[handle.index()] = Some(normalized);
+                    }
+                    overflow |= events.push(event).is_err();
+                });
+                if process_data.numSamples > 0 {
+                    self.visit_input_events(process_data, &mut |event| {
+                        overflow |= events.push(event).is_err();
+                    });
+                }
+                if !overflow {
+                    sort_events_by_sample_offset(events);
+                }
+                overflow
+            };
+            // VST3 hosts can flush parameter changes with no audio, including while stopped.
+            // Do not invoke the DSP kernel or construct audio views for a zero-frame flush.
+            if process_data.numSamples == 0 {
+                self.apply_final_parameter_values(final_param_values);
+                return kResultOk;
+            }
+            let events = if overflow {
+                ProcessEvents::Host(process_data)
+            } else {
+                ProcessEvents::Cached((&*self.events.get()).as_slice())
+            };
             let transport = self.transport(process_data);
             let process_mode = vst3_process_mode(process_data);
 
             let result = match symbolic_sample_size {
                 SymbolicSampleSizes_::kSample32 => {
-                    self.process_sample32(process_data, events.as_slice(), transport, process_mode)
+                    self.process_sample32(process_data, events, transport, process_mode)
                 }
                 SymbolicSampleSizes_::kSample64 => {
-                    self.process_sample64(process_data, events.as_slice(), transport, process_mode)
+                    self.process_sample64(process_data, events, transport, process_mode)
                 }
                 _ => kResultOk,
             };

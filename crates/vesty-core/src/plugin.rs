@@ -14,7 +14,11 @@ pub trait AudioKernel: Send + 'static {
     fn reset(&mut self) {}
     fn suspend(&mut self) {}
     fn resume(&mut self) {}
+    /// Process a sample-accurate event batch and its audio range. Dense host blocks may be split
+    /// into multiple calls. A zero-frame call delivers events at the next sample without advancing
+    /// audio; kernels must consume those events even when there are no samples to render.
     fn process(&mut self, context: &mut ProcessContext<'_>) -> ProcessResult;
+    /// The same event-batch and zero-frame contract as `process`, using native f64 audio.
     fn process_f64(&mut self, context: &mut ProcessContext64<'_>) -> ProcessResult {
         let _ = context;
         ProcessResult::Silence

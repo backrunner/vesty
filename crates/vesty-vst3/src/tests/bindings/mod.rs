@@ -20,7 +20,9 @@ use fixtures::*;
 
 mod buses;
 mod editor;
+mod event_bursts;
 mod factory;
+mod process_aliasing;
 mod process_events;
 mod process_safety;
 mod telemetry;

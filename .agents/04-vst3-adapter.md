@@ -65,16 +65,24 @@ Vesty processor wrapper 持有:
 
 ### process event ordering
 
-`vesty-vst3` 在 `process()` 中先收集 VST3 `IParameterChanges` 和 `IEventList`，再把合并后的固定容量 `FixedEventList` 按 `sample_offset` 做稳定排序，最后交给 `AudioKernel`。
+`vesty-vst3` 在 `process()` 中收集 VST3 `IParameterChanges` 和 `IEventList`。512 是单批事件缓存大小，不再是整个 host block 的容量上限。事件不超过缓存时，仍稳定排序后一次调用 `AudioKernel`；超量时按时间顺序分批消费，不因缓存满而丢弃 NoteOff 或参数自动化。
 
-- 排序使用固定 slice 上的插入排序，不创建新的 `Vec`，不扩容。
+- 超量路径使用预分配事件槽位和索引堆，每轮重新读取当前 host event lists，选择游标后的最早一批事件，因此也支持未排序的 host MIDI list。同 offset 按原收集顺序比较，参数队列先于 MIDI list，不合并或丢弃同采样点事件。
+- 音频只推进到下一批的首个 sample offset。若同一采样点的事件超过单批缓存，先以零帧 context 派发该点的部分事件，再派发剩余事件，最后生成该采样点的音频。`AudioKernel::process()` / `process_f64()` 必须消费零帧 context 中的事件，不能在处理事件之前因为 `frames == 0` 直接返回。
+- 子区间内事件 offset 从零开始；参数快照在每次派发之后更新，transport sample position 和 meter offset 按子区间起点调整。host 输入输出的别名隔离仍在整块范围进行，避免跨子区间覆盖尚未读取的输入；任意批次 panic 都会使整块输出静音。
+- 内存占用不会随单块事件数量增长，process 内不分配；超量路径重复扫描 host lists，因此 CPU 开销会随事件数量和批次数增长，不能承诺任意事件洪峰都能满足音频 deadline。SysEx 的 256-byte payload 截断限制仍独立存在。
+
+- 排序使用固定大小索引数组，按 `(sample_offset, 原始索引)` 做零分配排序，再按置换环搬动事件；已排序的事件直接返回。最坏排序复杂度为 O(n log n)，带内联 SysEx/text 的事件只需 O(n) 次搬动，不创建新的 `Vec`，不扩容。
+- 可用 `cargo test -p vesty-vst3 --features vst3-bindings --release event_sort_benchmark -- --ignored --nocapture` 对比原插入排序与索引排序；这是手动微基准，包含每轮事件缓冲复制，不能视为完整插件或 DAW 性能。
+- 事件只接受 bus `0` 和当前 block 内有效的 sample offset；MIDI channel/key 必须处于 `0..=15` / `0..=127`。非有限 NoteOn velocity / PolyPressure 被过滤，非有限 NoteOff velocity 使用 `0.0`，保留释放音符的动作。
+- 参数自动化过滤非有限值和越界 sample offset；零帧参数 flush 接受 offset `0`，在停止处理时同样生效，且不调用 DSP kernel。
 - 同一个 sample offset 的事件保留收集顺序；同 offset 的同参数自动化点由 `ParamAutomationSegments` 继续按“最后值生效”处理。
 - `ParamAutomationSegments` 假设输入事件已经是 sample-order；非 VST3 adapter 调用方如果自行构造 `ProcessContext`，也应遵守这个约定。
 - `ProcessData.processMode` 会映射到 `ProcessContext::process_mode()`，覆盖 `Realtime`、`Prefetch` 和 `Offline`，供 kernel 在 offline render 或 prefetch pass 中选择不同质量/缓存策略。
 - `IComponent::setIoMode()` 会接受并记录 VST3 标准 `kSimple`、`kAdvanced` 和 `kOfflineProcessing` mode，未知 mode 返回 `kInvalidArgument` 且不污染现有状态；实际每个 block 的 realtime/offline/prefetch DSP 选择仍以 `ProcessData.processMode` 为准。
 - `setupProcessing()` 会拒绝 null pointer、unsupported sample size、非有限或非正 sample rate、非正或异常大的 `maxSamplesPerBlock`，并返回 `kInvalidArgument`；无效 setup 不会创建 kernel、不会调用 `prepare()`，也不会为 sample64 scratch 预分配异常大小。
 - `IAudioProcessor::process()` 在 sample-size 检查后立即进入 `NoAllocGuard`，因此事件收集、排序、transport mirror、buffer/context 组装和 developer kernel 都被实时分配检测覆盖。
-- `IAudioProcessor::setProcessing(false)` 会把 processor 标记为显式非处理状态；如果异常 host 随后仍调用 `process()`，wrapper 会在 `NoAllocGuard` 内清零当前 host output buffers、设置 silence flags、返回 `kResultOk`，且不会进入 developer kernel。默认初始状态仍为 processing active，避免要求所有兼容 host 必须先调用 `setProcessing(true)`。
+- `IAudioProcessor::setProcessing(false)` 会把 processor 标记为显式非处理状态；如果 host 随后仍以非零帧调用 `process()`，wrapper 会在 `NoAllocGuard` 内清零当前 host output buffers、设置 silence flags、返回 `kResultOk`，且不会进入 developer kernel。零帧参数 flush 仍被接收。默认初始状态仍为 processing active，避免要求所有兼容 host 必须先调用 `setProcessing(true)`。
 - kernel 创建和 `prepare()` 发生在 `setupProcessing()` / `setActive(true)` 非实时生命周期；如果异常 host 在缺 kernel 时调用 `process()`，wrapper 会清零输出、设置 silence flags，并推固定结构 `HostWarning` RT log，不在实时区兜底分配。
 - `process()` 在构造 host input bus slice 前会校验 `numInputs` 不为负、不超过插件声明 input bus 数量，并要求非零 input count 搭配非 null input pointer；异常输入 bus shape 会清零输出、设置 silence flags、返回 `kResultOk`，且不会进入 developer kernel。
 - `process()` 在构造 per-bus channel pointer slice 前会先约束 `AudioBusBuffers::numChannels`: main input/sidechain input 只在 `1..=2` 范围内被转换为 DSP input slice；超出范围的 input bus 会被视为空输入以保持 host 兼容。output bus 还会按插件声明 layout 或 effect main bus mono/stereo 规则做严格 channel-count 校验，异常 output shape 会拒绝本次 output layout、返回 `kResultOk`，且不会进入 developer kernel。
@@ -193,7 +201,7 @@ MVP:
 - MIDI CC 到参数的 host mapping 已通过 `IMidiMapping` 暴露给 host。
 - Pitch bend/channel pressure 可作为参数 mapping；使用 `vesty_params::midi::PITCH_BEND` / `CHANNEL_PRESSURE` 等常量声明。
 
-- `examples/midi-synth` 已展示 developer-facing DSP 消费方式: 固定 SysEx `[F0, 7D, level, F7]` 更新 kernel 内部 level override，`note_expression::BRIGHTNESS` / `TUNING` 更新当前 active note 的音色/音高偏移；该示例单测直接构造 `ProcessContext` 验证事件消费，不写 controller state、不走 JSON、不在 realtime path 分配。
+- `examples/midi-synth` 按事件 sample offset 分段生成音频，NoteOn/NoteOff、参数自动化、固定 SysEx `[F0, 7D, level, F7]` 的 level override，以及 `note_expression::BRIGHTNESS` / `TUNING` 都在对应采样点生效。NoteOff 按 channel/key/note ID 匹配，零力度 NoteOn 释放匹配音符；`prepare()` 更新振荡器采样率。单测比较整块与逐采样处理结果，不写 controller state、不走 JSON、不在 realtime path 分配。
 
 后续:
 

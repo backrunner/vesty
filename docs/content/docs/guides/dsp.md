@@ -40,6 +40,10 @@ Return `ProcessResult::Silence` when the entire output is known to be silent. Ot
 
 The context carries sorted parameter and note events plus a transport snapshot. Instruments should consume NoteOn, NoteOff, pressure, pitch bend, and expression events by sample offset. Effects can inspect tempo and project position without querying the host from the callback.
 
+Dense host blocks are processed in batches of at most 512 events without dropping the remaining events. A kernel may receive multiple calls for one host block; sample offsets are relative to each call's audio range. If more events remain at the same sample, Vesty delivers a zero-frame context before rendering that sample. Consume its events even when `audio().frames() == 0`; only skip audio generation. This applies to both `process` and `process_f64`. The MIDI synth example demonstrates this contract.
+
+Batch storage is preallocated. Oversized blocks require additional scans of the host event lists, so CPU work grows with event volume even though memory stays bounded. This removes the event-count cutoff, not the audio callback's execution deadline.
+
 ## Double precision
 
 The default path uses `f32`. Opt into native `f64` processing only when the algorithm benefits:

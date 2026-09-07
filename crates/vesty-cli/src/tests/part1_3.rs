@@ -991,8 +991,8 @@
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "cargo workspace dependency `wry`"
-                && check.expected == "0.55.1"
-                && check.actual.as_deref() == Some("0.55.1")
+                && check.expected == "0.56.1"
+                && check.actual.as_deref() == Some("0.56.1")
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "Steinberg VST3 SDK baseline"
@@ -1090,8 +1090,8 @@ unreviewed = "9.9.9"
         assert_eq!(report.status, "ok");
         assert!(report.checks.iter().any(|check| {
             check.name == "crates.io latest `wry`"
-                && check.expected == "0.55.1"
-                && check.actual.as_deref() == Some("0.55.1")
+                && check.expected == "0.56.1"
+                && check.actual.as_deref() == Some("0.56.1")
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "npm registry latest `typescript`"
@@ -1100,23 +1100,23 @@ unreviewed = "9.9.9"
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "npm registry latest `react`"
-                && check.expected == "19.2.7"
-                && check.actual.as_deref() == Some("19.2.7")
+                && check.expected == "19.2.8"
+                && check.actual.as_deref() == Some("19.2.8")
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "npm registry latest `@types/react`"
-                && check.expected == "19.2.17"
-                && check.actual.as_deref() == Some("19.2.17")
+                && check.expected == "19.2.18"
+                && check.actual.as_deref() == Some("19.2.18")
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "npm registry latest `vue`"
-                && check.expected == "3.5.40"
-                && check.actual.as_deref() == Some("3.5.40")
+                && check.expected == "3.5.42"
+                && check.actual.as_deref() == Some("3.5.42")
         }));
         assert!(report.checks.iter().any(|check| {
             check.name == "npm registry latest `svelte`"
-                && check.expected == "5.56.5"
-                && check.actual.as_deref() == Some("5.56.5")
+                && check.expected == "5.57.0"
+                && check.actual.as_deref() == Some("5.57.0")
         }));
 
         let temp = tempfile::tempdir().unwrap();
@@ -1152,7 +1152,7 @@ unreviewed = "9.9.9"
         assert!(validate_dependency_baseline_report(&report).is_err());
         assert!(report.checks.iter().any(|check| {
             check.name == "crates.io latest `wry`"
-                && check.expected == "0.55.1"
+                && check.expected == "0.56.1"
                 && check.actual.as_deref() == Some("0.56.0")
                 && check.status == "failed"
         }));
@@ -1392,22 +1392,22 @@ unreviewed = "9.9.9"
     #[test]
     fn parses_exact_cargo_search_latest_version_line() {
         let output = r#"
-wry = "0.55.1"    # Cross-platform WebView rendering library
+wry = "0.56.1"    # Cross-platform WebView rendering library
 wry-webkit = "0.1.0"
 "#;
         assert_eq!(
             parse_cargo_search_latest_version("wry", output).as_deref(),
-            Some("0.55.1")
+            Some("0.56.1")
         );
         assert!(parse_cargo_search_latest_version("missing", output).is_none());
     }
 
     #[test]
     fn parses_crates_io_latest_version_response() {
-        let stable = r#"{"crate":{"max_stable_version":"0.55.1","max_version":"0.56.0-beta.1"}}"#;
+        let stable = r#"{"crate":{"max_stable_version":"0.56.1","max_version":"0.56.0-beta.1"}}"#;
         assert_eq!(
             parse_crates_io_latest_version(stable).as_deref(),
-            Some("0.55.1")
+            Some("0.56.1")
         );
 
         let prerelease_only = r#"{"crate":{"max_stable_version":null,"max_version":"1.0.0-rc.1"}}"#;

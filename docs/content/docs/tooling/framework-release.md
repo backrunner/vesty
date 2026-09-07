@@ -6,6 +6,22 @@ order: 5
 
 Vesty releases are tag-driven. A release tag publishes the framework SDK and CLI as one compatible set; uploading a CLI binary without its Rust and npm dependencies is not a valid release.
 
+## Distribution status
+
+The framework is currently available through a source checkout. No framework crates, `vesty-plugin-ui` npm package, or prebuilt CLI GitHub Release is published yet. Use [Get started](/docs/quick-start) for the working local-path workflow.
+
+The intended release has three matching channels:
+
+| Channel | User receives | User workflow after publication |
+| --- | --- | --- |
+| GitHub Releases | Platform CLI archives, checksums, provenance | Install CLI, run `vesty templates` / `vesty new` |
+| crates.io | Framework crates and `vesty-cli` at the same version | Generated exact version pins; optional `cargo install vesty-cli --locked` |
+| npm | `vesty-plugin-ui` with framework adapters | Install dependencies in the generated `ui/` directory |
+
+Users distribute their finished plugins as platform-specific `.vst3` bundles; they do not need to publish their plugin project to crates.io. Once the first release exists, promote the published installer workflow in the quick start, remove the local source overrides, and verify headless plus UI onboarding against the public registries.
+
+The steps below are the maintainer release procedure, not a claim that these artifacts already exist.
+
 ## Configure repository environments
 
 Complete the first crates.io and npm publications manually. Both registries require a package to exist before its owner can add a trusted publisher. After the packages exist, create two protected GitHub environments with no registry secrets:

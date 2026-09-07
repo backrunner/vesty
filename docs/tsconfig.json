@@ -3,6 +3,7 @@
   "compilerOptions": {
     "strict": true,
     "skipLibCheck": true,
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true
   }
 }

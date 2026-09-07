@@ -14,11 +14,17 @@ vesty release-check --help
 
 ## Create a project
 
+First complete the [source installation](/docs/quick-start) and set `VESTY_SOURCE`. Registry packages are not published yet.
+
 ```bash
-vesty new my-plugin
-vesty new my-plugin --template web-ui-react
 vesty templates
+vesty new my-plugin --template gain --vesty-path "$VESTY_SOURCE/crates/vesty"
+vesty new my-plugin-ui --template web-ui-param-demo \
+  --vesty-path "$VESTY_SOURCE/crates/vesty" \
+  --plugin-ui-path "$VESTY_SOURCE/packages/plugin-ui"
 ```
+
+Build the local SDK before installing a generated UI: `npm ci --prefix "$VESTY_SOURCE"` and `npm run build --prefix "$VESTY_SOURCE"`. With no template option, `new` defaults to React; explicit `--kind` and `--ui` override template defaults.
 
 Templates include native gain and instrument examples plus vanilla, React, Vue, and Svelte Web UI starters. Generated UI controls initialize from current `ready.paramValues` and subscribe to confirmed changes.
 

@@ -2,7 +2,7 @@ import { defineConfig } from 'svedocs/config';
 
 export default defineConfig({
   site: {
-    url: process.env.VESTY_DOCS_URL || undefined,
+    url: process.env.VESTY_DOCS_URL || 'https://vesty.pwp.sh',
     name: 'Vesty',
     title: 'Vesty documentation',
     description: 'Build VST3 effects and instruments in Rust with explicit realtime boundaries and system WebView editors.'
@@ -70,7 +70,7 @@ export default defineConfig({
         'landing.terminalLabel': 'Plugin scaffold command preview',
         'landing.preview': 'PREVIEW',
         'landing.templateLabel': 'Choose a starter',
-        'landing.terminalComment': 'Start with a kernel. Add your interface.',
+        'landing.terminalComment': 'Install from source first → Get started',
         'landing.fileTree': 'Selected files in the generated project',
         'landing.ready': 'ready when you are',
         'landing.copy': 'copy command',
@@ -142,7 +142,7 @@ export default defineConfig({
         'landing.terminalLabel': '插件脚手架命令预览',
         'landing.preview': '预览',
         'landing.templateLabel': '选择起始模板',
-        'landing.terminalComment': '从内核开始，接上你的界面。',
+        'landing.terminalComment': '先从源码安装 CLI → 快速开始',
         'landing.fileTree': '生成项目的部分文件',
         'landing.ready': '等待你的第一条命令',
         'landing.copy': '复制命令',

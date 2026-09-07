@@ -160,7 +160,7 @@ body { color: var(--sd-ink); font-family: var(--font-sans); }
 .terminal-comment { margin: 0 0 12px; color: var(--terminal-muted); font-size: 11px; }
 .terminal-command { display: flex; align-items: baseline; gap: 12px; color: var(--terminal-ink); font-size: 12px; line-height: 1.75; }
 .terminal-command > span { color: var(--terminal-green); }
-.terminal-command code { overflow-wrap: anywhere; }
+.terminal-command code { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .file-tree { margin: 24px 0; color: #62758d; font-size: 11px; line-height: 1.9; }
 .file-tree p { margin: 0; }
 .file-tree span { color: var(--terminal-muted); }

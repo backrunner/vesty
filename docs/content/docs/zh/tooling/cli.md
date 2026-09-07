@@ -14,11 +14,17 @@ vesty release-check --help
 
 ## 创建工程
 
+先完成[源码安装](/docs/zh/quick-start)，设置 `VESTY_SOURCE`。目前 registry 包尚未发布。
+
 ```bash
-vesty new my-plugin
-vesty new my-plugin --template web-ui-react
 vesty templates
+vesty new my-plugin --template gain --vesty-path "$VESTY_SOURCE/crates/vesty"
+vesty new my-plugin-ui --template web-ui-param-demo \
+  --vesty-path "$VESTY_SOURCE/crates/vesty" \
+  --plugin-ui-path "$VESTY_SOURCE/packages/plugin-ui"
 ```
+
+安装生成 UI 的依赖前，先运行 `npm ci --prefix "$VESTY_SOURCE"` 和 `npm run build --prefix "$VESTY_SOURCE"` 构建本地 SDK。不指定模板时默认使用 React；显式传入的 `--kind` 和 `--ui` 会覆盖模板默认值。
 
 模板包括原生增益效果器、乐器，以及原生 JavaScript、React、Vue 和 Svelte Web UI 起始工程。生成的 UI 会从当前 `ready.paramValues` 初始化，并订阅宿主确认后的参数变化。
 

@@ -12,14 +12,14 @@ order: 1
 
 你需要 Rust 1.95 或更高版本。只有开发 Web UI 时才需要 Node.js 24 或更高版本。启用 `wry` 后端还需要当前平台的 WebView 开发库；最后的冒烟测试则需要一个 VST3 宿主。
 
-按照[快速开始](/docs/zh/quick-start)安装预编译 CLI，然后验证可执行文件和本机环境：
+按照[快速开始](/docs/zh/quick-start)从源码安装 CLI，然后验证可执行文件和本机环境：
 
 ```bash
 vesty --version
 vesty doctor
 ```
 
-CLI 内置了维护中的工程模板，并把生成的 Rust 与 npm 依赖固定到匹配的 Vesty release。只有参与 Vesty 框架开发或测试尚未发布的版本时，才需要源码 checkout。
+框架尚未发布到 registry。请保留快速开始中的源码仓库和 `VESTY_SOURCE`；本教程使用本地路径覆盖。在准备存放新工程的目录运行创建命令。
 
 ## 2. 创建效果器工程
 
@@ -27,7 +27,7 @@ CLI 内置了维护中的工程模板，并把生成的 Rust 与 npm 依赖固�
 
 ```bash
 vesty templates
-vesty new signal-gain --template gain
+vesty new signal-gain --template gain --vesty-path "$VESTY_SOURCE/crates/vesty"
 cd signal-gain
 ```
 
@@ -48,10 +48,10 @@ signal-gain/
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-vesty = "=0.1.0"
+vesty = { path = "/absolute/path/to/vesty-source/crates/vesty", default-features = false, features = ["vst3-bindings"] }
 ```
 
-生成的依赖版本与 `vesty --version` 保持一致。除非明确同时升级 CLI 和框架，否则应保留这个精确版本。
+请保留 CLI 生成的实际绝对路径，上面只是路径格式示例。框架发布到 registry 后，CLI 才能改为生成与 `vesty --version` 对应的精确版本依赖。升级时应同时更新 CLI 与框架。
 
 ## 3. 确立不可随意变更的身份
 
@@ -89,7 +89,7 @@ const INFO: PluginInfo = PluginInfo {
 };
 ```
 
-打包过程会验证这两处表示是否一致。如果不一致，构建应直接失败，而不是等到运行时再猜测哪一份元数据才正确。
+请保持这两处表示一致。静态验证检查包元数据和所需导出符号，但不会实例化二进制以比较运行时的 `PluginInfo`；还需要用 Steinberg validator 和宿主测试确认二者一致。
 
 ## 4. 声明宿主可见参数
 
@@ -209,40 +209,45 @@ impl Plugin for SignalGain {
 
 不要把 `String`、UI 对象、文件句柄、互斥锁或可能动态增长的集合放进实时处理路径。延迟线、查找表和临时存储空间应在 `create_kernel()` 或 `prepare()` 中预先分配，之后才进入 `process()`。
 
-## 6. 连续处理宿主自动化
+## 6. 按采样位置处理宿主自动化
 
-宿主可能在一个音频块内放入多个增益自动化点。如果整块只读取一次参数，自动化精度就会退化到块级。`ParamAutomationSegments` 会把已排序的事件转换为一组有界区间：
+宿主可能在一个音频块内放入多个增益和旁路自动化点，任何一个参数只在块开头读取都会丢失其时间信息。先渲染到下一个已排序事件的位置，再应用变化，最后渲染尾段。仅处理一个参数时，可以使用 `ParamAutomationSegments` 简化同样的分段流程：
 
 ```rust
 impl AudioKernel for SignalKernel {
     fn process(&mut self, context: &mut ProcessContext<'_>) -> ProcessResult {
-        let bypass = context.param_normalized(self.bypass).unwrap_or(0.0) >= 0.5;
-        let initial_gain = context.param_normalized(self.gain).unwrap_or(0.833_333);
-        let frames = context.audio().frames().min(u32::MAX as usize) as u32;
+        let mut bypass = context.param_normalized(self.bypass).unwrap_or(0.0) >= 0.5;
+        let mut gain = context.param_normalized(self.gain).unwrap_or(5.0 / 6.0);
         let channels = context
             .audio()
             .input_channels()
             .min(context.audio().output_channels());
         let (audio, events) = context.audio_mut_and_events();
+        let mut start = 0;
 
-        for segment in ParamAutomationSegments::new(events, self.gain, initial_gain, frames) {
-            let gain_db = -60.0 + segment.normalized * 72.0;
+        // The final None renders the tail after the last event.
+        for event in events.iter().map(Some).chain(std::iter::once(None)) {
+            let end = event.map_or(audio.frames(), |event| {
+                (event.sample_offset() as usize).min(audio.frames())
+            });
             let amplitude = if bypass {
                 1.0
             } else {
-                10.0_f32.powf(gain_db as f32 / 20.0)
+                10.0_f32.powf((-60.0 + gain * 72.0) as f32 / 20.0)
             };
-
             for channel in 0..channels {
-                audio.copy_input_to_output_range(
-                    channel,
-                    segment.start_sample as usize,
-                    segment.end_sample as usize,
-                    amplitude,
-                );
+                audio.copy_input_to_output_range(channel, start, end, amplitude);
+            }
+            start = end;
+
+            if let Some(Event::Param { handle, normalized, .. }) = event {
+                if *handle == self.gain {
+                    gain = *normalized;
+                } else if *handle == self.bypass {
+                    bypass = *normalized >= 0.5;
+                }
             }
         }
-
         ProcessResult::Continue
     }
 }
@@ -256,7 +261,7 @@ vesty::export_vst3!(SignalGain);
 
 ## 7. 不依赖 DAW 测试音频内核
 
-在插件工程中保留一个小型、结果确定的 DSP 测试。默认的 `0 dB` 设置应当逐采样复制两个声道：
+在插件工程中保留一个小型、结果确定的 DSP 测试。默认的 `0 dB` 设置应当在浮点误差容限内保持两个声道的信号：
 
 ```rust
 #[cfg(test)]
@@ -288,8 +293,43 @@ mod tests {
             assert_eq!(kernel.process(&mut context), ProcessResult::Continue);
         }
 
-        assert_eq!(left_out, left);
-        assert_eq!(right_out, right);
+        // Parameter storage and dB conversion introduce floating-point rounding.
+        for (actual, expected) in left_out.iter().zip(left).chain(right_out.iter().zip(right)) {
+            assert!((actual - expected).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn bypass_takes_effect_at_its_sample_offset() {
+        let plugin = SignalGain::default();
+        let mut kernel = plugin.create_kernel(KernelInit {
+            sample_rate: 48_000.0,
+            max_block_size: 4,
+        });
+        let events = [
+            Event::Param {
+                sample_offset: 0,
+                handle: plugin.params.resolve_or_invalid("gain"),
+                id_hash: 0,
+                normalized: 0.0,
+            },
+            Event::Param {
+                sample_offset: 2,
+                handle: plugin.params.resolve_or_invalid("bypass"),
+                id_hash: 0,
+                normalized: 1.0,
+            },
+        ];
+        let input = [1.0_f32; 4];
+        let inputs: [&[f32]; 1] = [&input];
+        let mut output = [0.0_f32; 4];
+        let mut outputs: [&mut [f32]; 1] = [&mut output];
+        let audio = AudioBuffers::new(&inputs, &mut outputs);
+        let mut context = ProcessContext::new(audio, plugin.params(), &events, Transport::default());
+        kernel.process(&mut context);
+        for (actual, expected) in output.iter().zip([0.001_f32, 0.001, 1.0, 1.0]) {
+            assert!((actual - expected).abs() < 1e-6);
+        }
     }
 }
 ```
@@ -312,11 +352,15 @@ VST3 适配层会在宿主调用的处理路径外启用 Vesty 的内存分配�
 
 ```bash
 cd ..
-vesty new signal-gain-ui --template web-ui-param-demo
+npm ci --prefix "$VESTY_SOURCE"
+npm run build --prefix "$VESTY_SOURCE"
+vesty new signal-gain-ui --template web-ui-param-demo \
+  --vesty-path "$VESTY_SOURCE/crates/vesty" \
+  --plugin-ui-path "$VESTY_SOURCE/packages/plugin-ui"
 cd signal-gain-ui
 ```
 
-也可以给现有插件添加下面的 UI 描述，并创建 `ui/` 应用：
+也可以把现有依赖的 `vst3-bindings` 改为 `vst3-wry-ui`，按 [Web UI](/docs/zh/guides/web-ui)添加 `[ui]` 配置，并创建使用本地 SDK 的 `ui/` 应用。然后添加下面的 UI 描述：
 
 ```rust
 fn ui(&self) -> Option<UiDescriptor> {
@@ -348,7 +392,7 @@ Web UI 路径中的任何工作都不能由 `process()` 调用；JSON 与 WebVie
 先构建发布模式的动态库：
 
 ```bash
-cargo build --release
+vesty build --config vesty.toml
 ```
 
 根据目标平台传入对应的二进制文件：
@@ -361,11 +405,11 @@ vesty package \
   --binary target/release/libsignal_gain.dylib \
   --out target/vesty
 
-# Windows x64: target/release/signal_gain.dll
-# Linux x64:   target/release/libsignal_gain.so
+# Windows：使用 --platform windows --binary target/release/signal_gain.dll
+# Linux：使用 --platform linux --binary target/release/libsignal_gain.so
 ```
 
-如果工程包含 UI，打包过程会运行配置中的构建命令，并且只复制生成的 `dist` 资源。不要把 `node_modules` 或开发服务器 URL 作为发布内容放进插件包。
+如果工程包含 UI，`vesty build` 会运行配置的 UI 构建命令。打包随后只复制已有的 `dist` 资源，不会重新构建。不要把 `node_modules` 或开发服务器 URL 作为发布内容放进插件包。
 
 ## 10. 打开 DAW 前先验证
 

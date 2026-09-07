@@ -20,6 +20,17 @@ pub fn package_vst3(
     let binary_source = require_real_file(&options.binary_path)?;
     validate_binary_format(&binary_source, options.platform)?;
 
+    if let Some(ui) = &config.ui
+        && let Some(dist) = &ui.dist
+    {
+        let ui_dist = options.project_dir.join(&ui.dir).join(dist);
+        if !real_directory_exists_no_symlink(&ui_dist)? {
+            return Err(BuildError::InvalidConfig(format!(
+                "UI assets are missing at {ui_dist}; run `vesty build` before packaging"
+            )));
+        }
+    }
+
     let plugin_name = sanitize_bundle_name(&config.plugin.name);
     let bundle_dir = options.output_dir.join(format!("{plugin_name}.vst3"));
     let contents_dir = bundle_dir.join("Contents");

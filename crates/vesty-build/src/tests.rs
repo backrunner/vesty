@@ -1228,6 +1228,28 @@ fn validation_rejects_misnamed_linux_binary() {
 }
 
 #[test]
+fn package_rejects_unbuilt_ui_before_creating_bundle() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = Utf8PathBuf::from_path_buf(dir.path().join("project")).unwrap();
+    let out = Utf8PathBuf::from_path_buf(dir.path().join("out")).unwrap();
+    let binary = project.join("target/release/Gain");
+    fs::create_dir_all(binary.parent().unwrap()).unwrap();
+    fs::write(&binary, test_binary_bytes(BundlePlatform::Macos)).unwrap();
+    let error = package_vst3(
+        &test_config(),
+        &PackageOptions {
+            project_dir: project,
+            output_dir: out.clone(),
+            platform: BundlePlatform::Macos,
+            binary_path: binary,
+        },
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("run `vesty build`"));
+    assert!(!out.exists());
+}
+
+#[test]
 fn package_rejects_binary_format_mismatch() {
     let dir = tempfile::tempdir().unwrap();
     let project = Utf8PathBuf::from_path_buf(dir.path().join("project")).unwrap();

@@ -3,9 +3,9 @@
 </p>
 
 <p align="center">
-  <a href="docs/content/docs/index.md"><strong>English docs</strong></a> ·
-  <a href="docs/content/docs/zh/index.md"><strong>简体中文</strong></a> ·
-  <a href="docs/content/docs/guides/complete-plugin.md">Build a plugin</a> ·
+  <a href="https://vesty.pwp.sh/docs"><strong>English docs</strong></a> ·
+  <a href="https://vesty.pwp.sh/docs/zh"><strong>简体中文</strong></a> ·
+  <a href="https://vesty.pwp.sh/docs/guides/complete-plugin">Build a plugin</a> ·
   <a href="examples/">Examples</a> ·
   <a href="https://github.com/backrunner/vesty/releases">Releases</a>
 </p>
@@ -31,36 +31,23 @@ The audio callback must not allocate, lock, block, format logs, process JSON, or
 
 Use Rust **1.95+**, and Node.js **24+** for Web UI projects. The `wry` backend also needs the platform's WebView development libraries; run `vesty doctor` to inspect your environment.
 
-Install the CLI from GitHub Releases on macOS or Linux:
+**Source distribution is available today.** The framework crates, npm SDK, and prebuilt CLI releases are not published yet. Install from a checkout and point the starter at that same source:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -LsSf \
-  https://raw.githubusercontent.com/backrunner/vesty/main/scripts/install.sh | sh
-vesty --version
-vesty doctor
-```
-
-Then create a plugin:
-
-```bash
-vesty templates
-vesty new my-plugin --template gain
+git clone https://github.com/backrunner/vesty.git vesty-source
+cd vesty-source
+export VESTY_SOURCE="$PWD"
+cargo install --path crates/vesty-cli --locked
+cd ..
+vesty new my-plugin --template gain --vesty-path "$VESTY_SOURCE/crates/vesty"
 cd my-plugin
 cargo test
+vesty build --config vesty.toml
 ```
 
-<details>
-<summary>Windows and prerelease installs</summary>
+Keep the source checkout available. The generated project refers to its absolute path; record the framework commit and retain lockfiles. For UI templates, first build the SDK with `npm ci` and `npm run build` in the source checkout, then also pass `--plugin-ui-path "$VESTY_SOURCE/packages/plugin-ui"`.
 
-In PowerShell:
-
-```powershell
-irm https://raw.githubusercontent.com/backrunner/vesty/main/scripts/install.ps1 | iex
-```
-
-The installers select the latest stable GitHub Release. To install an alpha or beta, set `VESTY_VERSION` to its v-prefixed release tag. See [Get started](docs/content/docs/quick-start.md) for installation details and [CLI tooling](docs/content/docs/tooling/cli.md) for source checkout workflows.
-
-</details>
+See [Get started](https://vesty.pwp.sh/docs/quick-start) for Windows commands, all seven templates, and platform-specific packaging and validation. Published CLI archives, matched crates.io dependencies, and the npm SDK are the planned release channels; see [Framework releases](https://vesty.pwp.sh/docs/tooling/framework-release).
 
 Follow the [complete plugin tutorial](docs/content/docs/guides/complete-plugin.md) to implement the effect, build a VST3 bundle, and validate it.
 
@@ -76,7 +63,7 @@ Dense event blocks use batches of up to 512 events; later events are retained. K
 
 ## Read the docs
 
-The bilingual [Svedocs site](docs/) includes a custom Vesty theme and landing page. Its source is fully included here.
+The bilingual [documentation site](https://vesty.pwp.sh) includes a custom Vesty theme and landing page. Its source is fully included here.
 
 | Learn | Build | Ship |
 | --- | --- | --- |

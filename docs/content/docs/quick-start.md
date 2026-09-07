@@ -1,140 +1,124 @@
 ---
 title: Get started
-description: Build, test, and validate your first Vesty audio effect.
+description: Build, package, and validate your first Vesty plugin from the current source.
 order: 0
 ---
 
-Vesty keeps DSP in Rust while letting you build the editor with familiar web frameworks. This guide creates the smallest useful audio effect, verifies it, and points you to the next stage of development.
+Vesty is currently distributed as source. The framework crates, `vesty-plugin-ui` npm package, and prebuilt CLI releases have **not yet been published**. Use the checkout workflow below; the release installer and registry-only dependencies are for a future published release.
 
 ## Requirements
 
-- Rust 1.95 or newer.
-- A VST3 host for manual testing.
-- Node.js 24 or newer only when the plugin has a Web UI.
-- Platform WebView development libraries when compiling the `wry` backend.
+- Rust 1.95+ and your platform's native linker/toolchain (Xcode command line tools on macOS, MSVC Build Tools on Windows, or a C/C++ toolchain on Linux).
+- Git, and a VST3 host for the eventual DAW test.
+- Node.js 24+ and npm only for a Web UI.
+- UI builds use the system WebView: WKWebView on macOS, WebView2 on Windows, and WebKitGTK 4.1 on Linux. On Debian/Ubuntu install `build-essential libgtk-3-dev libwebkit2gtk-4.1-dev libxdo-dev pkg-config`. Headless templates do not enable the WebView backend.
 
-## Install Vesty
+## 1. Install the CLI from source
 
-Install the prebuilt CLI from GitHub Releases. The installer selects the archive for your platform, verifies its SHA-256 checksum, and writes `vesty` to `~/.local/bin` by default.
-
-```bash
-curl --proto '=https' --tlsv1.2 -LsSf \
-  https://raw.githubusercontent.com/backrunner/vesty/main/scripts/install.sh | sh
-```
-
-On Windows PowerShell:
-
-```powershell
-irm https://raw.githubusercontent.com/backrunner/vesty/main/scripts/install.ps1 | iex
-```
-
-The installers use the latest stable GitHub Release. To install an alpha, beta, or other specific version, set `VESTY_VERSION` to the v-prefixed tag listed on the Releases page. You can also download an archive and `SHA256SUMS` manually from the same release.
-
-Verify the CLI and inspect the local toolchain:
+Run this in the directory where you keep development checkouts:
 
 ```bash
+git clone https://github.com/backrunner/vesty.git vesty-source
+cd vesty-source
+export VESTY_SOURCE="$PWD"
+cargo install --path crates/vesty-cli --locked
 vesty --version
 vesty doctor
+cd ..
 ```
 
-If the shell cannot find `vesty`, add `~/.local/bin` to `PATH` and open a new terminal.
+In Windows PowerShell:
 
-## Create a plugin
+```powershell
+git clone https://github.com/backrunner/vesty.git vesty-source
+Set-Location vesty-source
+$env:VESTY_SOURCE = (Get-Location).Path
+cargo install --path crates/vesty-cli --locked
+vesty --version
+vesty doctor
+Set-Location ..
+```
 
-List the built-in starters, then scaffold the headless gain effect used in this guide:
+Cargo installs the executable into its bin directory (normally `~/.cargo/bin`); ensure that directory is on `PATH`. Some `doctor` checks concern optional validator, UI, or signing tools, so only install the tools required for your current workflow.
+
+Keep the source checkout: generated projects depend on its absolute path. Record `git -C "$VESTY_SOURCE" rev-parse HEAD` alongside your project and retain Cargo/npm lockfiles to reproduce a build. Reinstall the CLI from the same checkout when upgrading it. In a new terminal, set `VESTY_SOURCE` again to that checkout's absolute path.
+
+## 2. Create a headless effect
+
+The following commands use a POSIX shell (macOS/Linux):
 
 ```bash
 vesty templates
-vesty new my-plugin --template gain
+vesty new my-plugin --template gain --vesty-path "$VESTY_SOURCE/crates/vesty"
 cd my-plugin
+cargo test
+vesty param-manifest --specs params.specs.json --out vesty-parameters.json --check
+vesty build --config vesty.toml
 ```
 
-The CLI writes the plugin metadata, parameter manifest, `vesty.toml`, and a Rust dependency pinned to the framework version that matches the CLI. Use `--template web-ui-param-demo`, `--template vue-ui-param-demo`, or `--template svelte-ui-param-demo` when you want a Web editor from the start.
+For PowerShell, use `--vesty-path "$env:VESTY_SOURCE/crates/vesty"`; the other commands are the same.
 
-## Inspect the gain effect
+The CLI creates a standalone Cargo project, Rust implementation, `vesty.toml`, parameter specifications, and a stable parameter manifest. The gain starter enables only `vst3-bindings`, processes gain automation at sample offsets, and needs no Node.js or WebView. The [complete plugin tutorial](/docs/guides/complete-plugin) adds DSP tests and bypass.
 
-The generated `src/lib.rs` follows this minimal structure:
+## 3. Package and validate
 
-```rust title="src/lib.rs (abridged)"
-use vesty::prelude::*;
-
-#[derive(Params)]
-struct GainParams {
-    gain: FloatParam,
-}
-
-impl Default for GainParams {
-    fn default() -> Self {
-        Self {
-            gain: FloatParam::new("gain", "Gain", -60.0, 12.0, 0.0)
-                .with_unit("dB"),
-        }
-    }
-}
-
-#[derive(Default)]
-struct GainPlugin {
-    params: GainParams,
-}
-
-struct GainKernel {
-    gain: ParamHandle,
-}
-
-impl Plugin for GainPlugin {
-    const INFO: PluginInfo = PluginInfo {
-        name: "My Gain",
-        vendor: "My Company",
-        url: "https://example.invalid",
-        email: "",
-        version: "0.1.0",
-        class_id: *b"MYGAINPLUGIN0001",
-        kind: PluginKind::AudioEffect,
-    };
-
-    type Params = GainParams;
-    type Kernel = GainKernel;
-
-    fn params(&self) -> &Self::Params { &self.params }
-
-    fn create_kernel(&self, _init: KernelInit) -> Self::Kernel {
-        GainKernel { gain: self.params.resolve_or_invalid("gain") }
-    }
-}
-
-impl AudioKernel for GainKernel {
-    fn process(&mut self, context: &mut ProcessContext<'_>) -> ProcessResult {
-        let normalized = context.param_normalized(self.gain).unwrap_or(0.833_333);
-        let gain_db = -60.0 + normalized * 72.0;
-        let gain = 10.0_f32.powf(gain_db as f32 / 20.0);
-        let channels = context.audio().input_channels()
-            .min(context.audio().output_channels());
-        let audio = context.audio_mut();
-
-        for channel in 0..channels {
-            audio.copy_input_to_output(channel, gain);
-        }
-
-        ProcessResult::Continue
-    }
-}
-
-vesty::export_vst3!(GainPlugin);
-```
-
-## Verify the workspace
+Choose the command matching the machine on which you built the plugin:
 
 ```bash
-cargo fmt --all --check
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
+# macOS
+vesty package --config vesty.toml --platform macos --binary target/release/libmy_plugin.dylib
+
+# Linux
+vesty package --config vesty.toml --platform linux --binary target/release/libmy_plugin.so
+
+# Windows (PowerShell)
+vesty package --config vesty.toml --platform windows --binary target/release/my_plugin.dll
 ```
 
-The repository includes working examples under `examples/gain`, `examples/midi-synth`, and `examples/web-ui-param-demo`.
+Then:
+
+```bash
+vesty validate target/vesty/my-plugin.vst3 --static-only --strict
+```
+
+This checks the bundle, metadata, exports, and manifest. It does not run a DAW or Steinberg's validator. Follow [Packaging](/docs/tooling/packaging) and [Release evidence](/docs/tooling/release-evidence) for host installation, validator runs, and platform release checks.
+
+## 4. Start with a Web UI
+
+First build the local bridge package from the same checkout, then create a separate plugin. Run from the parent directory of `my-plugin`:
+
+```bash
+npm ci --prefix "$VESTY_SOURCE"
+npm run build --prefix "$VESTY_SOURCE"
+vesty new my-plugin-ui --template svelte-ui-param-demo \
+  --vesty-path "$VESTY_SOURCE/crates/vesty" \
+  --plugin-ui-path "$VESTY_SOURCE/packages/plugin-ui"
+cd my-plugin-ui
+npm install --prefix ui
+npm run typecheck --prefix ui
+npm run build --prefix ui
+vesty build --config vesty.toml
+```
+
+PowerShell uses `$env:VESTY_SOURCE` and a backtick instead of `\` for multiline commands; you can also put each command on one line.
+
+The source override produces a local `file:` dependency for `vesty-plugin-ui`; building the SDK first supplies its compiled exports. Run `npm run dev --prefix ui` in one terminal and `vesty dev --config vesty.toml` in another. Open the plugin in a host to exercise the real bridge; a browser preview alone does not provide host parameter state. `vesty build` runs the configured UI build. Run it before `vesty package`, which copies the existing `dist` assets.
+
+| Template | Kind | Editor |
+| --- | --- | --- |
+| `gain` | Effect | None |
+| `midi-synth` | Monophonic instrument | None |
+| `web-ui-param-demo` | Effect | React |
+| `vanilla-ui-param-demo` | Effect | TypeScript |
+| `vue-ui-param-demo` | Effect | Vue |
+| `svelte-ui-param-demo` | Effect | Svelte |
+| `web-ui-instrument` | Monophonic instrument | React |
+
+Without `--template`, the CLI defaults to a React effect. While using unreleased source, always supply `--vesty-path`, plus `--plugin-ui-path` for a UI template. Otherwise the generated project requests unavailable registry packages.
 
 ## Continue
 
-- Learn how the native and WebView halves fit together in [Architecture](/docs/concepts/architecture).
-- Read the non-negotiable [Realtime safety](/docs/concepts/realtime-safety) rules.
-- Add a parameter with the [Parameters guide](/docs/guides/parameters).
-- Build an editor with the [Web UI guide](/docs/guides/web-ui).
+- [Complete plugin tutorial](/docs/guides/complete-plugin): identities, DSP, tests, and packaging.
+- [MIDI instruments](/docs/guides/midi): note identity, sample timing, and dense event batches.
+- [Web UI](/docs/guides/web-ui): host-authoritative parameter gestures.
+- [Framework releases](/docs/tooling/framework-release): planned CLI, crates.io, and npm distribution.

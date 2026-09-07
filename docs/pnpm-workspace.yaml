@@ -2,6 +2,10 @@ allowBuilds:
   esbuild: true
   sharp: true
   workerd: true
+overrides:
+  # Upstream pins pre-fix versions; remove once Svedocs/Kit update them.
+  'svedocs>sharp': 0.35.4
+  '@sveltejs/kit>cookie': 0.7.2
 minimumReleaseAgeExclude:
   - svedocs-cli@0.1.0-beta.8 || 0.2.1
   - svedocs@0.1.0-beta.8 || 0.2.1

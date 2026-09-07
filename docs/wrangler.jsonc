@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vesty-docs",
+  "account_id": "b6754402d59fc29ee8b62119014fec89",
+  "compatibility_date": "2026-07-15",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./build",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "vesty.pwp.sh", "custom_domain": true }
+  ]
+}

@@ -8,7 +8,7 @@
 
   let template = 'gain';
   let copyState: 'idle' | 'copied' | 'failed' = 'idle';
-  $: command = `vesty new my-plugin --template ${template}`;
+  $: command = `vesty new my-plugin --template ${template} \\\n  --vesty-path "$VESTY_SOURCE/crates/vesty"${template === 'gain' ? '' : ' \\\n  --plugin-ui-path "$VESTY_SOURCE/packages/plugin-ui"'}`;
 
   function selectTemplate(value: string) {
     template = value;

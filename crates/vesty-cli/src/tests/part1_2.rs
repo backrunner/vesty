@@ -1011,30 +1011,6 @@ Result: 47 tests passed, 0 tests failed
         }
         assert!(root.join("README.md").is_file());
         assert!(root.join("LICENSE-APACHE").is_file());
-        let readme = fs::read_to_string(root.join("README.md")).unwrap();
-        for expected in [
-            "FloatParam::new(\"gain\", \"Gain\", -60.0, 12.0, 0.0).with_unit(\"dB\")",
-            "const INFO: PluginInfo = PluginInfo",
-            "fn params(&self) -> &Self::Params",
-            "fn create_kernel(&self, _init: KernelInit) -> Self::Kernel",
-            "fn process(&mut self, context: &mut ProcessContext<'_>) -> ProcessResult",
-            "audio.copy_input_to_output(channel, gain)",
-        ] {
-            assert!(
-                readme.contains(expected),
-                "README minimal plugin example is missing current API shape: {expected}"
-            );
-        }
-        for stale in [
-            "#[param(id",
-            "fn create_kernel(params:",
-            "copy_input_to_output(linear)",
-        ] {
-            assert!(
-                !readme.contains(stale),
-                "README minimal plugin example contains stale API shape: {stale}"
-            );
-        }
 
         for entry in fs::read_dir(root.join("crates")).unwrap() {
             let entry = entry.unwrap();

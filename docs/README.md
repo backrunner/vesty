@@ -31,9 +31,19 @@ pnpm build:static
 | `pnpm build:spa` | Static SPA with a `200.html` fallback |
 | `pnpm preview` | Preview the last production build locally |
 
-The default `pnpm build` uses the edge adapter. These commands build artifacts; they do not publish the site or configure DNS.
+Production is **https://vesty.pwp.sh**, served by Cloudflare Workers Static Assets. `wrangler.jsonc` pins the worker name, account, static output, custom domain, and real 404 handling. No Worker runtime or server-side credentials are needed for local search. The default `pnpm build` still offers the Svedocs edge adapter for development; production uses `build:static`.
 
-Set `VESTY_DOCS_URL` to the site's public origin when checking or building for production. For example, `VESTY_DOCS_URL=https://your-docs-domain.example pnpm build:static`. Use the actual domain, without a route suffix. Without it, local development still works, but Svedocs warns that absolute sitemap URLs are unavailable.
+Authenticate Wrangler against the configured Cloudflare account, then:
+
+```bash
+pnpm exec wrangler whoami
+pnpm deploy:dry-run
+pnpm run deploy
+```
+
+`pnpm run deploy` runs content checks, Svelte checks, and the static build before uploading. Use `run` because `pnpm deploy` is pnpm's unrelated workspace deployment command. Wrangler configures the `vesty.pwp.sh` custom domain. Do not upload an edge build or use an SPA fallback for this deployment. `static/404.html` provides recovery links and is served with HTTP 404 for unknown routes.
+
+The canonical origin defaults to `https://vesty.pwp.sh`; only set `VESTY_DOCS_URL` for an intentional alternate deployment. After deploying, verify EN/ZH homepages and guides, search, template copying, locale/theme switching, mobile navigation, SVG assets, `sitemap.xml`, `robots.txt`, and an unknown route. Check HTTP status codes and browser console/network failures. To roll back, use `pnpm exec wrangler deployments list` and `pnpm exec wrangler rollback <version-id>`.
 
 Build scripts pass `--no-og` because the SvelteKit OG endpoint already renders the configured images. This avoids a duplicate generated `static/og` tree colliding with prerender entries. Search is local and AI is disabled, so a static deployment does not need an AI service or server-side search credentials.
 
@@ -59,6 +69,7 @@ Vesty's site uses a modern terminal style: a near-black blue background, green c
 | `static/favicon.svg` | Same geometry with automatic light/dark color for browser tabs |
 | `static/brand/vesty-banner.svg` | Standalone README banner with accessible SVG title and description |
 | `src/lib/Landing.svelte` | Bilingual homepage, template selector, command copy, architecture, and guide entry points |
+| `src/lib/FooterLinks.svelte` | Visible license and repository labels, avoiding duplicate GitHub icons for the license URL |
 | `src/lib/Brand.svelte` | Localized navigation lockup using the symbol and wordmark |
 | `src/lib/styles/vesty.css` | Site tokens, reading styles, responsive landing layout, and focus treatment |
 | `svedocs.config.ts` | Branding, font stacks, translations, navigation, search, and SEO |
@@ -71,3 +82,5 @@ The homepage terminal previews real scaffold commands and selected project files
 ## Upgrade Svedocs
 
 Upgrade the framework and CLI together, keeping exact versions in `package.json`, then commit the updated `pnpm-lock.yaml`. Review any version-specific entries in `pnpm-workspace.yaml` too. Run content checks, static and edge builds, then verify navigation, search, localization, and theme switching in the browser.
+
+The lockfile currently overrides Svedocs' pinned `sharp` to 0.35.4 (fixed libvips vulnerabilities) and SvelteKit's `cookie` to 0.7.2 (fixed cookie validation). Remove those targeted overrides when upstream includes the fixes. Run `pnpm audit` when refreshing dependencies. The production deployment serves only prerendered assets.

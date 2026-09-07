@@ -6,6 +6,22 @@ order: 5
 
 Vesty 使用 tag 驱动发布。一个 release tag 必须把框架 SDK 与 CLI 作为一组兼容产物发布；只有 CLI 二进制、没有对应 Rust 与 npm 依赖的发布是不完整的。
 
+## 当前分发状态
+
+目前框架通过源码仓库提供，框架 crates、`vesty-plugin-ui` npm 包和预编译 CLI GitHub Release 均尚未发布。可用的本地路径流程见[快速开始](/docs/zh/quick-start)。
+
+正式分发包含三个版本一致的渠道：
+
+| 渠道 | 提供内容 | 发布后的用户流程 |
+| --- | --- | --- |
+| GitHub Releases | 各平台 CLI 压缩包、校验和与来源证明 | 安装 CLI，再执行 `vesty templates` / `vesty new` |
+| crates.io | 同版本框架 crates 与 `vesty-cli` | 生成项目固定精确版本；也可 `cargo install vesty-cli --locked` |
+| npm | 带框架适配器的 `vesty-plugin-ui` | 在生成的 `ui/` 目录安装依赖 |
+
+用户完成插件后，应分发各平台的 `.vst3` 包，不需要把插件工程发布到 crates.io。首个版本发布后，再把快速开始切换到发布版安装流程、移除本地路径覆盖，并使用公共 registry 实测无界面和带 UI 的完整上手流程。
+
+下方是维护者发布操作流程，不表示这些产物已经存在。
+
 ## 配置仓库环境
 
 第一次 crates.io 与 npm 发布需要手动完成。两个 registry 都要求包已经存在，owner 才能添加 trusted publisher。包建立后，在 GitHub 中创建两个不保存 registry secret 的受保护环境：

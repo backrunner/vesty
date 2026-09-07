@@ -11,5 +11,6 @@ order: 3
 3. [DSP 内核](/docs/zh/guides/dsp)：在不违反实时约束的前提下处理音频和事件。
 4. [Web UI](/docs/zh/guides/web-ui)：通过强类型 JSBridge 连接编辑器和原生层。
 5. [状态与生命周期](/docs/zh/guides/state-and-lifecycle)：恢复工程并正确响应宿主生命周期。
+6. [MIDI 与事件时序](/docs/zh/guides/midi)：处理音符标识、密集事件分批与零帧调用。
 
 这些指南关注各层之间的契约，不限定具体的 UI 框架或 DSP 算法。

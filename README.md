@@ -1,32 +1,37 @@
+<p align="center">
+  <img src="docs/static/brand/vesty-banner.svg" alt="Vesty — Native sound. Your interface. Build VST3 effects and instruments in Rust." width="100%" />
+</p>
+
+<p align="center">
+  <a href="docs/content/docs/index.md"><strong>English docs</strong></a> ·
+  <a href="docs/content/docs/zh/index.md"><strong>简体中文</strong></a> ·
+  <a href="docs/content/docs/guides/complete-plugin.md">Build a plugin</a> ·
+  <a href="examples/">Examples</a> ·
+  <a href="https://github.com/backrunner/vesty/releases">Releases</a>
+</p>
+
 # Vesty
 
-Vesty is a Rust-first framework for building VST3 audio plugins with realtime-safe DSP and system WebView user interfaces.
+A Rust-first framework for VST3 effects and instruments. Keep DSP native, give parameters a stable identity, and build your editor with JavaScript, React, Vue, or Svelte in a directly embedded system WebView.
 
-Audio processing stays native and deterministic. Plugin editors can use ordinary JavaScript, React, Vue, or Svelte without adding Tauri to the plugin runtime.
+> **Alpha.** Local framework tests and validation tools are available. Release readiness still requires real DAW, platform WebView, Steinberg validator, signing, and notarization evidence. See the [release evidence guide](docs/content/docs/tooling/release-evidence.md).
 
-> Vesty is alpha software. The core framework and local validation tools are implemented, but release readiness still requires real DAW, platform WebView, Steinberg validator, signing, and notarization evidence.
+## Built for the audio thread
 
-## What It Provides
+| Native processing | Editor development | From source to plugin |
+| --- | --- | --- |
+| Borrowed f32/f64 audio buffers | System WebView through `wry` | Embedded starter templates |
+| Sample-accurate automation and MIDI | Typed JSBridge and generated TypeScript | VST3 packaging and validation |
+| Preallocated event batches and lock-free queues | React, Vue, Svelte, or plain JavaScript | Parameter manifests and release checks |
+| Typed parameters and stable VST3 IDs | Host-authoritative state and edit gestures | Reproducible CLI workflows |
 
-- Rust traits and process contexts for audio effects and instruments.
-- Typed parameters with stable VST3 IDs and realtime-safe handles.
-- Fixed-capacity events, lock-free queues, meters, and diagnostics.
-- VST3 factory, processor, controller, state, automation, and editor integration.
-- A typed JSBridge with generated TypeScript protocol definitions.
-- Direct system WebView embedding through `wry`.
-- A `vesty` CLI for scaffolding, building, packaging, validation, and release checks.
-- Gain, MIDI synth, and Web UI example plugins.
-- A multilingual Svedocs documentation site and companion AI development skill.
+The audio callback must not allocate, lock, block, format logs, process JSON, or call WebView APIs. UI and control work live outside that boundary. Vesty embeds `wry` directly, with no Tauri runtime.
 
-## Quick Start
+## Start building
 
-Requirements:
+Use Rust **1.95+**, and Node.js **24+** for Web UI projects. The `wry` backend also needs the platform's WebView development libraries; run `vesty doctor` to inspect your environment.
 
-- Rust 1.95 or newer
-- Node.js 24 or newer for the UI packages
-- Platform WebView development libraries when enabling the `wry` backend
-
-Install the prebuilt CLI from the latest GitHub Release:
+Install the CLI from GitHub Releases on macOS or Linux:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
@@ -35,7 +40,7 @@ vesty --version
 vesty doctor
 ```
 
-Then create a plugin from an embedded starter:
+Then create a plugin:
 
 ```bash
 vesty templates
@@ -44,120 +49,62 @@ cd my-plugin
 cargo test
 ```
 
-Windows users can run `irm https://raw.githubusercontent.com/backrunner/vesty/main/scripts/install.ps1 | iex` in PowerShell. Source checkout instructions remain available for contributors and unreleased development.
+<details>
+<summary>Windows and prerelease installs</summary>
 
-The complete English and Simplified Chinese guides live in [`docs/`](docs/). Start with the [complete plugin tutorial](docs/content/docs/guides/complete-plugin.md) for the path from scaffold to validated VST3 bundle.
+In PowerShell:
 
-AI-assisted workflows can use the repository-distributed [`vesty-plugin-dev`](skills/vesty-plugin-dev/SKILL.md) skill. Its instructions preserve realtime boundaries and distinguish local checks from external release evidence.
-
-## Minimal Plugin
-
-```rust
-use vesty::prelude::*;
-
-#[derive(Params)]
-struct MyParams {
-    gain: FloatParam,
-}
-
-impl Default for MyParams {
-    fn default() -> Self {
-        Self {
-            gain: FloatParam::new("gain", "Gain", -60.0, 12.0, 0.0).with_unit("dB"),
-        }
-    }
-}
-
-#[derive(Default)]
-struct MyPlugin {
-    params: MyParams,
-}
-
-struct MyKernel {
-    gain: ParamHandle,
-}
-
-impl Plugin for MyPlugin {
-    const INFO: PluginInfo = PluginInfo {
-        name: "My Plugin",
-        vendor: "My Company",
-        url: "https://github.com/backrunner/vesty",
-        email: "",
-        version: "0.1.0",
-        class_id: *b"VESTYEXAMPLE0001",
-        kind: PluginKind::AudioEffect,
-    };
-
-    type Params = MyParams;
-    type Kernel = MyKernel;
-
-    fn params(&self) -> &Self::Params {
-        &self.params
-    }
-
-    fn create_kernel(&self, _init: KernelInit) -> Self::Kernel {
-        MyKernel {
-            gain: self.params.resolve_or_invalid("gain"),
-        }
-    }
-}
-
-impl AudioKernel for MyKernel {
-    fn process(&mut self, context: &mut ProcessContext<'_>) -> ProcessResult {
-        let normalized = context.param_normalized(self.gain).unwrap_or(0.833_333);
-        let gain_db = -60.0 + normalized * 72.0;
-        let gain = 10.0_f32.powf(gain_db as f32 / 20.0);
-        let channels = context
-            .audio()
-            .input_channels()
-            .min(context.audio().output_channels());
-        let audio = context.audio_mut();
-
-        for channel in 0..channels {
-            audio.copy_input_to_output(channel, gain);
-        }
-
-        ProcessResult::Continue
-    }
-}
-
-vesty::export_vst3!(MyPlugin);
+```powershell
+irm https://raw.githubusercontent.com/backrunner/vesty/main/scripts/install.ps1 | iex
 ```
 
-The audio `process` path must not allocate, lock, block, perform JSON work, call WebView APIs, or format logs.
+The installers select the latest stable GitHub Release. To install an alpha or beta, set `VESTY_VERSION` to its v-prefixed release tag. See [Get started](docs/content/docs/quick-start.md) for installation details and [CLI tooling](docs/content/docs/tooling/cli.md) for source checkout workflows.
 
-## Repository Layout
+</details>
 
-- `crates/`: Rust framework, VST3 adapter, WebView runtime, build support, macros, and CLI.
-- `packages/`: `vesty-plugin-ui` plus React, Vue, and Svelte adapters.
-- `examples/`: example VST3 plugins and Web UI assets.
-- `docs/`: multilingual Svedocs site, tutorials, guides, and references.
-- `skills/`: installable AI development workflows for Vesty projects.
-- `.agents/`: architecture research, implementation notes, and completion audits.
+Follow the [complete plugin tutorial](docs/content/docs/guides/complete-plugin.md) to implement the effect, build a VST3 bundle, and validate it.
 
-## Verification
+## Choose your starting point
+
+| Example | Explore |
+| --- | --- |
+| [Gain](examples/gain) | An audio effect with typed parameters and automation |
+| [MIDI synth](examples/midi-synth) | Notes, expression, SysEx, and sample-accurate event processing |
+| [Web UI parameter demo](examples/web-ui-param-demo) | A WebView editor connected to host parameter state |
+
+Dense event blocks use batches of up to 512 events; later events are retained. Kernels must consume zero-frame event contexts too. SysEx still has a separate 256-byte payload limit. The [MIDI guide](docs/content/docs/guides/midi.md) explains timing, note identity, capacity, and CPU tradeoffs.
+
+## Read the docs
+
+The bilingual [Svedocs site](docs/) includes a custom Vesty theme and landing page. Its source is fully included here.
+
+| Learn | Build | Ship |
+| --- | --- | --- |
+| [Architecture](docs/content/docs/concepts/architecture.md) | [Parameters](docs/content/docs/guides/parameters.md) | [CLI](docs/content/docs/tooling/cli.md) |
+| [Realtime safety](docs/content/docs/concepts/realtime-safety.md) | [DSP and MIDI](docs/content/docs/guides/midi.md) | [Packaging](docs/content/docs/tooling/packaging.md) |
+| [Plugin API](docs/content/docs/reference/plugin-api.md) | [Web UI](docs/content/docs/guides/web-ui.md) | [Release evidence](docs/content/docs/tooling/release-evidence.md) |
+
+Run the site locally with `cd docs && pnpm install --frozen-lockfile && pnpm dev`. See [site maintenance](docs/README.md) for builds, deployment, and branding.
+
+For AI-assisted development, use the repository's [`vesty-plugin-dev` skill](skills/vesty-plugin-dev/SKILL.md), which preserves realtime boundaries and release-evidence requirements.
+
+## Contribute
+
+The repository is organized into Rust [crates](crates/), the [UI package](packages/), [examples](examples/), and [documentation](docs/). Architecture notes and completion audits live in [.agents](.agents/).
+
+Read [AGENTS.md](AGENTS.md) for development rules. Keep commits focused and use `type(scope): description`, for example `fix(vst3): preserve sample-accurate automation`.
 
 ```bash
 cargo fmt --all --check
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace --all-features
+cargo clippy --workspace --all-targets --all-features -- -D warnings
 npm run typecheck
 npm test
 cargo run -p vesty-cli -- export-types --out target/vesty-protocol --check
 ```
 
-These checks validate the repository locally. They do not replace real host and platform release evidence.
-
-## Contributing
-
-Project-specific development rules are in `AGENTS.md`. Commit messages use:
-
-```text
-xxx(comp): desc
-```
-
-Keep commits focused and use lowercase types and scopes, for example `fix(vst3): preserve sample-accurate automation`.
+These checks verify the repository locally. They complement real host and platform testing.
 
 ## License
 
-Vesty is licensed under the [Apache License 2.0](LICENSE-APACHE).
+[Apache License 2.0](LICENSE-APACHE).

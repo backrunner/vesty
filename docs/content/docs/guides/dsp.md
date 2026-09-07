@@ -44,6 +44,8 @@ Dense host blocks are processed in batches of at most 512 events without droppin
 
 Batch storage is preallocated. Oversized blocks require additional scans of the host event lists, so CPU work grows with event volume even though memory stays bounded. This removes the event-count cutoff, not the audio callback's execution deadline.
 
+For note identity, MIDI mappings, payload limits, and a rendering timeline, see [MIDI and event timing](/docs/guides/midi).
+
 ## Double precision
 
 The default path uses `f32`. Opt into native `f64` processing only when the algorithm benefits:

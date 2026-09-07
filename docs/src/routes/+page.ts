@@ -1,3 +1,4 @@
+import { error } from '@sveltejs/kit';
 import pageLoaders from 'virtual:svedocs/page-loaders';
 import pages from 'virtual:svedocs/page-index';
 import tree from 'virtual:svedocs/tree';
@@ -10,8 +11,9 @@ export const prerender = svedocsPagePrerender();
 
 export const load: PageLoad = async () => {
   const pageIndex = pages.find((page) => page.routePath === '/');
-  const page = pageIndex ? await loadFullPage(pageIndex) : undefined;
-  return { page, pages: page ? mergeCurrentPage(pages, page) : pages, search: [], tree, config };
+  if (!pageIndex) error(404, 'Homepage content not found');
+  const page = await loadFullPage(pageIndex);
+  return { page, pages: mergeCurrentPage(pages, page), search: [], tree, config };
 };
 
 async function loadFullPage(page: SvedocsPage): Promise<SvedocsPage> {

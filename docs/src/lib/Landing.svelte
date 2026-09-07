@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import type { SvedocsPage } from 'svedocs/core';
   import type { SvedocsThemeContext } from 'svedocs/theme/types';
   import { resolveLocalizedHref } from 'svedocs/theme/headless';
@@ -7,167 +6,139 @@
   export let page: SvedocsPage;
   export let context: SvedocsThemeContext;
 
-  let canvas: HTMLCanvasElement;
+  let template = 'gain';
+  let copyState: 'idle' | 'copied' | 'failed' = 'idle';
+  $: command = `vesty new my-plugin --template ${template}`;
 
-  const stages = [
-    ['landing.stageHost', 'landing.stageHostDescription'],
-    ['landing.stageAdapter', 'landing.stageAdapterDescription'],
-    ['landing.stageKernel', 'landing.stageKernelDescription'],
-    ['landing.stageEditor', 'landing.stageEditorDescription']
-  ];
+  function selectTemplate(value: string) {
+    template = value;
+    copyState = 'idle';
+  }
+
+  async function copyCommand() {
+    try {
+      await navigator.clipboard.writeText(command);
+      copyState = 'copied';
+    } catch {
+      copyState = 'failed';
+    }
+  }
 
   const guides = [
     ['01', 'landing.cardStart', 'landing.cardStartDescription', '/docs/guides/complete-plugin'],
-    ['02', 'landing.cardRealtime', 'landing.cardRealtimeDescription', '/docs/concepts/realtime-safety'],
+    ['02', 'landing.cardMidi', 'landing.cardMidiDescription', '/docs/guides/midi'],
     ['03', 'landing.cardWeb', 'landing.cardWebDescription', '/docs/guides/web-ui'],
     ['04', 'landing.cardShip', 'landing.cardShipDescription', '/docs/tooling/packaging']
   ];
-
-  onMount(() => {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let frame = 0;
-    let animation = 0;
-    let width = 0;
-    let height = 0;
-    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let reduceMotion = motion.matches;
-
-    const resize = () => {
-      const rect = canvas.getBoundingClientRect();
-      const scale = Math.min(window.devicePixelRatio || 1, 2);
-      width = Math.max(1, rect.width);
-      height = Math.max(1, rect.height);
-      canvas.width = Math.round(width * scale);
-      canvas.height = Math.round(height * scale);
-      ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    };
-
-    const drawWave = (y: number, amplitude: number, frequency: number, color: string, offset: number) => {
-      ctx.beginPath();
-      for (let x = 0; x <= width; x += 3) {
-        const envelope = Math.sin(Math.PI * (x / width));
-        const signal = Math.sin(x * frequency + frame * 0.018 + offset)
-          + Math.sin(x * frequency * 0.31 - frame * 0.011) * 0.34;
-        const point = y + signal * amplitude * envelope;
-        if (x === 0) ctx.moveTo(x, point);
-        else ctx.lineTo(x, point);
-      }
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.25;
-      ctx.stroke();
-    };
-
-    const render = () => {
-      ctx.clearRect(0, 0, width, height);
-      ctx.globalAlpha = 0.22;
-      ctx.strokeStyle = '#7a6f5a';
-      ctx.lineWidth = 1;
-      for (let y = 32; y < height; y += 48) {
-        ctx.beginPath();
-        ctx.moveTo(0, y + 0.5);
-        ctx.lineTo(width, y + 0.5);
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 0.8;
-      drawWave(height * 0.43, 36, 0.026, '#d5ad57', 0);
-      ctx.globalAlpha = 0.58;
-      drawWave(height * 0.61, 24, 0.041, '#d96049', 1.7);
-      ctx.globalAlpha = 1;
-      frame += 1;
-      if (!reduceMotion) animation = requestAnimationFrame(render);
-    };
-
-    const handleResize = () => {
-      resize();
-      if (reduceMotion) render();
-    };
-
-    const handleMotion = (event: MediaQueryListEvent) => {
-      reduceMotion = event.matches;
-      cancelAnimationFrame(animation);
-      frame = 0;
-      render();
-    };
-
-    resize();
-    window.addEventListener('resize', handleResize);
-    motion.addEventListener('change', handleMotion);
-    render();
-
-    return () => {
-      cancelAnimationFrame(animation);
-      window.removeEventListener('resize', handleResize);
-      motion.removeEventListener('change', handleMotion);
-    };
-  });
 </script>
 
 <div class="landing-shell">
   <section class="landing-hero" aria-labelledby="vesty-title">
-    <canvas bind:this={canvas} class="signal-canvas" aria-hidden="true"></canvas>
     <div class="hero-status">
-      <span>{context.t('landing.status')}</span>
-      <span>44.1—192 kHz</span>
-      <span>f32 / f64</span>
+      <span><i aria-hidden="true"></i>{context.t('landing.status')}</span>
+      <span>RUST / VST3 / WEBVIEW</span>
+      <a href="https://github.com/backrunner/vesty/blob/main/LICENSE-APACHE">APACHE-2.0 ↗</a>
     </div>
-    <div class="hero-copy">
-      <p class="eyebrow"><span aria-hidden="true"></span>{context.t('landing.eyebrow')}</p>
-      <h1 id="vesty-title">{page.title}</h1>
-      <p class="hero-description">{context.t('landing.description')}</p>
-      <div class="hero-actions">
-        <a class="action-primary" href={resolveLocalizedHref('/docs/quick-start', context)}>{context.t('landing.docs')} <span aria-hidden="true">→</span></a>
-        <a class="action-secondary" href="https://github.com/backrunner/vesty">{context.t('landing.github')} <span aria-hidden="true">↗</span></a>
+    <div class="hero-main">
+      <div class="hero-copy">
+        <p class="eyebrow"><img src="/brand/vesty-mark.svg" alt="" width="32" height="32" />{page.title} · {context.t('landing.eyebrow')}</p>
+        <h1 id="vesty-title">{context.t('landing.headline')}<br /><em>{context.t('landing.headlineAccent')}</em><span class="cursor" aria-hidden="true">_</span></h1>
+        <p class="hero-description">{context.t('landing.description')}</p>
+        <div class="hero-actions">
+          <a class="action-primary" href={resolveLocalizedHref('/docs/quick-start', context)}>{context.t('home.primaryAction')} <span aria-hidden="true">→</span></a>
+          <a class="action-secondary" href="https://github.com/backrunner/vesty">{context.t('landing.github')} <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+      <div class="terminal" aria-label={context.t('landing.terminalLabel')}>
+        <div class="terminal-title"><span aria-hidden="true">⌘</span><span>~/my-plugin</span><span class="terminal-tag">{context.t('landing.preview')}</span></div>
+        <div class="terminal-tabs" role="group" aria-label={context.t('landing.templateLabel')}>
+          <button type="button" aria-pressed={template === 'gain'} on:click={() => selectTemplate('gain')}>01 / Rust DSP</button>
+          <button type="button" aria-pressed={template === 'svelte-ui-param-demo'} on:click={() => selectTemplate('svelte-ui-param-demo')}>02 / + Web UI</button>
+        </div>
+        <div class="terminal-body">
+          <p class="terminal-comment"># {context.t('landing.terminalComment')}</p>
+          <div class="terminal-command"><span aria-hidden="true">❯</span><code>{command}</code></div>
+          <div class="file-tree" aria-label={context.t('landing.fileTree')}>
+            <p><span>my-plugin/</span></p>
+            <p>├── <span>src/lib.rs</span><small>// Rust DSP</small></p>
+            <p>├── <span>Cargo.toml</span></p>
+            <p>├── <span>vesty.toml</span></p>
+            <p>├── <span>vesty-parameters.json</span></p>
+            {#if template === 'svelte-ui-param-demo'}
+              <p>└── <span>ui/</span><small>// Svelte</small></p>
+            {:else}
+              <p>└── <span>params.specs.json</span></p>
+            {/if}
+          </div>
+          <div class="terminal-signal" aria-hidden="true">
+            <span>signal.rs</span>
+            <svg viewBox="0 0 420 80" fill="none">
+              <path d="M0 40H420" stroke="currentColor" stroke-dasharray="2 6" opacity=".3" />
+              <path d="M0 40h45l15-18 21 38 28-46 31 53 33-60 36 67 36-67 33 60 31-53 28 46 21-38 15 18h53" stroke="currentColor" stroke-width="2" />
+            </svg>
+            <span>f32 / f64</span>
+          </div>
+        </div>
+        <div class="terminal-footer">
+          <span aria-live="polite">{context.t(copyState === 'copied' ? 'landing.copied' : copyState === 'failed' ? 'landing.copyFailed' : 'landing.ready')}</span>
+          <button type="button" on:click={copyCommand}>{context.t('landing.copy')} <span aria-hidden="true">↗</span></button>
+        </div>
       </div>
     </div>
-    <dl class="hero-metrics">
-      <div><dt>{context.t('landing.scope')}</dt><dd>{context.t('landing.scopeValue')}</dd></div>
-      <div><dt>{context.t('landing.bridge')}</dt><dd>{context.t('landing.bridgeValue')}</dd></div>
-      <div><dt>{context.t('landing.editor')}</dt><dd>{context.t('landing.editorValue')}</dd></div>
-    </dl>
-    <div class="hero-command" aria-label={context.t('landing.commandLabel')}><span>$</span><code>vesty new my-plugin --template gain</code></div>
+    <div class="hero-bottom">
+      <p>{context.t('landing.heroNote')}</p>
+      <a class="hero-command" href={resolveLocalizedHref('/docs/concepts/realtime-safety', context)}><span aria-hidden="true">↳</span><code>process() {context.t('landing.boundaryTag')}</code></a>
+    </div>
   </section>
 
-  <section class="signal-section">
+  <div class="capability-strip" aria-label={context.t('landing.capabilities')}>
+    <span>{context.t('landing.effects')}</span><span>{context.t('landing.instruments')}</span><span>{context.t('landing.automation')}</span><span>React / Vue / Svelte</span>
+  </div>
+
+  <section class="signal-section" aria-labelledby="architecture-title">
     <div class="section-heading">
-      <p>{context.t('landing.systemLabel')}</p>
-      <h2>{context.t('landing.signalTitle')}</h2>
+      <p>01 / {context.t('nav.concepts')}</p>
+      <h2 id="architecture-title">{context.t('landing.signalTitle')}</h2>
       <span>{context.t('landing.signalDescription')}</span>
     </div>
-    <ol class="signal-stages">
-      {#each stages as stage, index}
-        <li>
-          <span class="stage-index">0{index + 1}</span>
-          <div><strong>{context.t(stage[0])}</strong><small>{context.t(stage[1])}</small></div>
-          {#if index < stages.length - 1}<i aria-hidden="true"></i>{/if}
-        </li>
-      {/each}
-    </ol>
+    <div class="architecture">
+      <div class="audio-lane">
+        <p class="lane-label">{context.t('landing.audioLane')}</p>
+        <ol class="signal-stages">
+          <li><span>01</span><strong>{context.t('landing.stageHost')}</strong><small>{context.t('landing.stageHostDescription')}</small></li>
+          <li><span>02</span><strong>{context.t('landing.stageAdapter')}</strong><small>{context.t('landing.stageAdapterDescription')}</small></li>
+          <li><span>03</span><strong>{context.t('landing.stageKernel')}</strong><small>{context.t('landing.stageKernelDescription')}</small></li>
+        </ol>
+      </div>
+      <div class="control-lane">
+        <p class="lane-label">{context.t('landing.controlLane')}</p>
+        <p><strong>{context.t('landing.stageEditor')}</strong><span>↔ JSBridge ↔</span><strong>{context.t('landing.controller')}</strong></p>
+        <small>{context.t('landing.boundaryNote')}</small>
+      </div>
+    </div>
+    <a class="text-link" href={resolveLocalizedHref('/docs/concepts/architecture', context)}>{context.t('home.secondaryAction')} <span aria-hidden="true">↗</span></a>
   </section>
 
-  <section class="explore-section">
-    <div class="section-heading compact">
-      <p>{context.t('landing.mapLabel')}</p>
-      <h2>{context.t('landing.explore')}</h2>
+  <section class="explore-section" aria-labelledby="guides-title">
+    <div class="section-heading">
+      <p>02 / {context.t('nav.guides')}</p>
+      <h2 id="guides-title">{context.t('landing.explore')}</h2>
       <span>{context.t('landing.exploreDescription')}</span>
     </div>
     <div class="guide-grid">
       {#each guides as guide}
         <a href={resolveLocalizedHref(guide[3], context)}>
           <span>{guide[0]}</span>
-          <strong>{context.t(guide[1])}</strong>
-          <small>{context.t(guide[2])}</small>
-          <i aria-hidden="true">→</i>
+          <div><strong>{context.t(guide[1])}</strong><small>{context.t(guide[2])}</small></div>
+          <i aria-hidden="true">↗</i>
         </a>
       {/each}
     </div>
   </section>
 
-  <section class="contract-section">
-    <p>{context.t('landing.contract')}</p>
-    <h2>{context.t('landing.contractTitle')}</h2>
-    <span>{context.t('landing.contractDescription')}</span>
-    <a href={resolveLocalizedHref('/docs/concepts/realtime-safety', context)}>{context.t('landing.contractAction')} <i aria-hidden="true">→</i></a>
+  <section class="contract-section" aria-labelledby="contract-title">
+    <div><p>03 / {context.t('landing.contract')}</p><h2 id="contract-title">{context.t('landing.contractTitle')}</h2></div>
+    <div><p>{context.t('landing.contractDescription')}</p><a href={resolveLocalizedHref('/docs/concepts/realtime-safety', context)}>{context.t('landing.contractAction')} <span aria-hidden="true">→</span></a></div>
   </section>
+  <aside class="alpha-note"><span>α</span><p>{context.t('landing.alphaNote')} <a href={resolveLocalizedHref('/docs/tooling/release-evidence', context)}>{context.t('landing.releaseEvidence')} ↗</a></p></aside>
 </div>

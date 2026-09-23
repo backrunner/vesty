@@ -1,6 +1,6 @@
 # Vesty documentation site
 
-The English and Simplified Chinese documentation uses **Svedocs 0.2.1** and **svedocs-cli 0.2.1**, installed from npm. A sibling Svedocs checkout is not required.
+The English and Simplified Chinese documentation uses **Svedocs 0.2.2** and **svedocs-cli 0.2.2**, installed from npm. A sibling Svedocs checkout is not required.
 
 ## Develop and verify
 
@@ -15,7 +15,7 @@ pnpm dev
 Before submitting a change:
 
 ```bash
-pnpm check
+pnpm check --strict
 pnpm check:ui
 pnpm build:static
 ```
@@ -59,7 +59,7 @@ Build scripts pass `--no-og` because the SvelteKit OG endpoint already renders t
 
 ## Theme and identity
 
-Vesty's site uses a modern terminal style: a near-black blue background, green command accents, cyan signal traces, monospace controls, and fine grid details. The logo is deliberately monochrome: two solid strokes form an asymmetric V, separated by a narrow diagonal gap. The lowercase wordmark uses custom vector letterforms.
+Vesty's site uses a modern terminal style: green command accents, cyan signal traces, monospace controls, and fine grid details. Light mode pairs a cool off-white surface with deep green and teal; dark mode uses near-black blue surfaces with brighter accents. Both the landing and reading pages share these semantic colors. The logo is deliberately monochrome: two solid strokes form an asymmetric V, separated by a narrow diagonal gap. The lowercase wordmark uses custom vector letterforms.
 
 | Asset / source | Purpose |
 | --- | --- |
@@ -71,16 +71,18 @@ Vesty's site uses a modern terminal style: a near-black blue background, green c
 | `src/lib/Landing.svelte` | Bilingual homepage, template selector, command copy, architecture, and guide entry points |
 | `src/lib/FooterLinks.svelte` | Visible license and repository labels, avoiding duplicate GitHub icons for the license URL |
 | `src/lib/Brand.svelte` | Localized navigation lockup using the symbol and wordmark |
+| `src/lib/theme/` | Navbar, sidebar, and footer composed with public Svedocs components and a square light/dark icon button |
 | `src/lib/styles/vesty.css` | Site tokens, reading styles, responsive landing layout, and focus treatment |
+| `src/lib/styles/chrome.css` | Navigation, reading geometry, code surfaces, sidebar, search, and footer styling |
 | `svedocs.config.ts` | Branding, font stacks, translations, navigation, search, and SEO |
 | `src/routes/+layout.svelte` | Imports Svedocs base theme followed by Vesty overrides |
 
 Use the symbol and wordmark in one color: dark on a light background, white on a dark background. Preserve the diagonal gap and the supplied proportions; do not add a container, cursor, gradient, or colored second stroke. Keep clear space around the mark. Logo assets are pure SVG paths; the banner's supporting text uses system fonts. No external font download or raster generation service is required.
 
-The homepage terminal previews real scaffold commands and selected project files. Switching the template updates the preview; the copy button copies the displayed command. It does not run shell commands. The signal trace is a static illustration: it runs no animation loop, starts no audio context, and makes no audio requests. The reading theme follows system preference and offers a persistent manual switch. Avoid adding continuous animation or inaccessible hover-only controls.
+The homepage uses static green/cyan ambient gradients and a typographic hero, with separate light/dark color values. Its terminal previews real scaffold commands and selected project files. Switching the template updates the preview; the copy button copies the displayed command. It does not run shell commands. The signal trace is a static illustration: it runs no animation loop, starts no audio context, and makes no audio requests. The theme follows system preference until a visitor chooses light or dark with the square icon button; Svedocs persists that choice across pages and reloads. The static 404 page honors the same preference. Avoid adding continuous animation or inaccessible hover-only controls.
 
 ## Upgrade Svedocs
 
 Upgrade the framework and CLI together, keeping exact versions in `package.json`, then commit the updated `pnpm-lock.yaml`. Review any version-specific entries in `pnpm-workspace.yaml` too. Run content checks, static and edge builds, then verify navigation, search, localization, and theme switching in the browser.
 
-The lockfile currently overrides Svedocs' pinned `sharp` to 0.35.4 (fixed libvips vulnerabilities) and SvelteKit's `cookie` to 0.7.2 (fixed cookie validation). Remove those targeted overrides when upstream includes the fixes. Run `pnpm audit` when refreshing dependencies. The production deployment serves only prerendered assets.
+The lockfile currently overrides Svedocs' and Miniflare's pinned `sharp` to 0.35.4 (fixed image-decoder vulnerabilities) and SvelteKit's `cookie` to 0.7.2 (fixed cookie validation). Remove those targeted overrides when upstream includes the fixes. Run `pnpm audit` when refreshing dependencies. The production deployment serves only prerendered assets.

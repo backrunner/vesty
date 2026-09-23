@@ -7,14 +7,31 @@
     <meta name="color-scheme" content="dark light">
     <title>404 · Vesty</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <script>
+      (() => {
+        let preference = 'system';
+        try { preference = localStorage.getItem('svedocs-theme') || 'system'; } catch {}
+        const media = matchMedia('(prefers-color-scheme: dark)');
+        const apply = () => {
+          const dark = preference === 'dark' || (preference !== 'light' && media.matches);
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        };
+        apply();
+        media.addEventListener('change', apply);
+      })();
+    </script>
     <style>
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0a0f15; color: #edf3f8; font: 16px/1.7 ui-monospace, monospace; }
+      :root { --bg: #f5f7f8; --ink: #18252d; --muted: #56656d; --accent: #306b26; --line: #d6dfe2; }
+      :root[data-theme="dark"] { --bg: #090d14; --ink: #edf2f8; --muted: #9aa8bb; --accent: #a3f77b; --line: #263244; }
+      @media (prefers-color-scheme: dark) { :root:not([data-theme]) { --bg: #090d14; --ink: #edf2f8; --muted: #9aa8bb; --accent: #a3f77b; --line: #263244; } }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--ink); font: 16px/1.7 ui-monospace, monospace; }
       main { max-width: 42rem; padding: 2rem; }
-      p { color: #b6c3d1; }
-      a { color: #a3f77b; text-underline-offset: .25em; }
-      nav { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+      h1 { font: 600 clamp(28px, 6vw, 40px)/1.2 system-ui, sans-serif; letter-spacing: -.04em; margin: 2rem 0; }
+      p { color: var(--muted); }
+      a { color: var(--accent); text-underline-offset: .25em; }
+      nav { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
       a:focus-visible { outline: 2px solid currentColor; outline-offset: 5px; }
-      @media (prefers-color-scheme: light) { body { background: #f6f8fa; color: #15212c; } p { color: #465568; } a { color: #306c25; } }
     </style>
   </head>
   <body>

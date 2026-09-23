@@ -9,7 +9,7 @@
 </script>
 
 <DocsApp page={data.page} pages={data.pages} tree={data.tree} search={data.search} config={data.config} {components} {layouts} {themeComponents} {loadSearch}>
-  <svelte:fragment slot="landing" let:page let:context>
-    <Landing {page} {context} />
+  <svelte:fragment slot="landing" let:context>
+    <Landing {context} />
   </svelte:fragment>
 </DocsApp>

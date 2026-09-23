@@ -1,9 +1,7 @@
 <script lang="ts">
-  import type { SvedocsPage } from 'svedocs/core';
   import type { SvedocsThemeContext } from 'svedocs/theme/types';
   import { resolveLocalizedHref } from 'svedocs/theme/headless';
 
-  export let page: SvedocsPage;
   export let context: SvedocsThemeContext;
 
   let template = 'gain';
@@ -41,8 +39,9 @@
     </div>
     <div class="hero-main">
       <div class="hero-copy">
-        <p class="eyebrow"><img src="/brand/vesty-mark.svg" alt="" width="32" height="32" />{page.title} · {context.t('landing.eyebrow')}</p>
-        <h1 id="vesty-title">{context.t('landing.headline')}<br /><em>{context.t('landing.headlineAccent')}</em><span class="cursor" aria-hidden="true">_</span></h1>
+        <p class="eyebrow"><span class="hero-signal-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>{context.t('landing.eyebrow')}</p>
+        <h1 id="vesty-title"><span>{context.t('landing.headline')}</span><em>{context.t('landing.headlineAccent')}</em></h1>
+        <p class="hero-subline">{context.t('landing.subline')}</p>
         <p class="hero-description">{context.t('landing.description')}</p>
         <div class="hero-actions">
           <a class="action-primary" href={resolveLocalizedHref('/docs/quick-start', context)}>{context.t('home.primaryAction')} <span aria-hidden="true">→</span></a>

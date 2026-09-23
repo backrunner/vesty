@@ -8,7 +8,13 @@ export default defineConfig({
   plugins: [
     svedocs({
       config: svedocsConfig,
-      theme: { components: { Brand: '$lib/Brand.svelte', FooterLinks: '$lib/FooterLinks.svelte' } }
+      theme: { components: {
+        Brand: '$lib/Brand.svelte',
+        Navbar: '$lib/theme/Navbar.svelte',
+        Sidebar: '$lib/theme/Sidebar.svelte',
+        Footer: '$lib/theme/Footer.svelte',
+        FooterLinks: '$lib/FooterLinks.svelte'
+      } }
     }),
     tailwindcss(),
     sveltekit()
